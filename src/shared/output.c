@@ -2,6 +2,13 @@
 #include "intrinsics/diff.h"
 #include "platform.h"
 
+static int lt__present_abort(int err) {
+  static const char sync_end[] = "\x1b[?2026l";
+  (void)lt__plat_write(sync_end, sizeof(sync_end) - 1);
+  (void)lt__plat_flush();
+  return err;
+}
+
 int lt_clear(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
@@ -30,6 +37,25 @@ int lt_present(void) {
 
   if (!lt__g.back || !lt__g.front || lt__g.width <= 0 || lt__g.height <= 0)
     return LT_ERR_NOT_INIT;
+
+  /* Fast-path: no dirty rows means nothing to render. Skipping the
+   * sync brackets here keeps no-change presents free (no WriteFile). */
+  bool any_dirty = false;
+  for (int y = 0; y < lt__g.height; y++)
+    if (lt__g.dirty_rows[y]) {
+      any_dirty = true;
+      break;
+    }
+
+  if (!any_dirty)
+    return lt__plat_flush();
+
+  /* Begin syncronized update (DEC mode 2026). Terminals that don't
+   * recognize this DECSET silently ignore it. Modern terminals atomically
+   * swap to the new frame at the matching end-sync bellow, killing tearing
+   * and letting the host coalesce reflow work. */
+  static const char sync_begin[] = "\x1b[?2026h";
+  (void)lt__plat_write(sync_begin, sizeof(sync_begin) - 1);
 
   lt__g.cur_x = -1;
   lt__g.cur_y = -1;
@@ -63,16 +89,14 @@ int lt_present(void) {
       if (x != lt__g.cur_x || y != lt__g.cur_y) {
         mc = lt__plat_move_cursor(x, y);
         if (mc != LT_OK) {
-          (void)lt__plat_flush();
-          return mc;
+          return lt__present_abort(mc);
         }
       }
 
       /* emit the entire run in one block */
       rc = lt__plat_render_run(&lt__g.back[idx], run_len);
       if (rc != LT_OK) {
-        (void)lt__plat_flush();
-        return rc;
+        return lt__present_abort(rc);
       }
 
       /* update cache for end-of-run position */
@@ -84,14 +108,17 @@ int lt_present(void) {
       }
 
       /* sync front for all cells in run */
-      for (int i = 0; i < run_len; i++)
-        lt__g.front[idx + i] = lt__g.back[idx + i];
+      memcpy(&lt__g.front[idx], &lt__g.back[idx],
+             (size_t)run_len * sizeof(struct lt_cell));
 
       x = run_end;
     }
 
     lt__g.dirty_rows[y] = false;
   }
+
+  static const char sync_end[] = "\x1b[?2026l";
+  (void)lt__plat_write(sync_end, sizeof(sync_end) - 1);
 
   return lt__plat_flush();
 }

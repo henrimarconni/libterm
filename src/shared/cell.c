@@ -13,6 +13,7 @@ int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg) {
   lt__g.back[idx].ch = ch;
   lt__g.back[idx].fg = fg;
   lt__g.back[idx].bg = bg;
+  lt__g.back[idx]._reserved = 0;
 
   return LT_OK;
 }

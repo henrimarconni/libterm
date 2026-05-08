@@ -7,7 +7,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#define LT__OUTBUF_CAP 8192
+/* conhost is within ~10% of fast-pipe so long
+ * as it receives large writes. 64 KiB confortably holds a full screen
+ * frame's VT bytes (incl. cursor jumps and later, SGR), so most presents
+ * become a single WriteFile call. */
+#define LT__OUTBUF_CAP (64 * 1024)
 
 static char lt__outbuf[LT__OUTBUF_CAP];
 static size_t lt__outbuf_len = 0;

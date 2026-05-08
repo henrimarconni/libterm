@@ -37,7 +37,7 @@ int lt__plat_init(void) {
     return LT_ERR_INIT_OPEN;
 
   DWORD out_mode = lt__win_out_mode_orig;
-  out_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+  out_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
   if (!SetConsoleMode(lt__win_out, out_mode)) {
     (void)SetConsoleMode(lt__win_in, lt__win_in_mode_orig);
     return LT_ERR_INIT_OPEN;

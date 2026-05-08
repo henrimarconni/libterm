@@ -1,5 +1,6 @@
 #define ARENA_IMPLEMENTATION
 #include "internal.h"
+#include "intrinsics/diff.h"
 #include "lib/arena.h"
 #include <stdlib.h>
 
@@ -8,6 +9,9 @@
 int lt__buffer_resize(int w, int h) {
   if (w <= 0 || h <= 0)
     return LT_ERR;
+
+  if (lt__g.width == w && lt__g.height == h)
+    return LT_OK;
 
   const size_t n = (size_t)(w * h);
   if (n == 0 || n > (SIZE_MAX / (2 * sizeof(struct lt_cell))))
@@ -34,8 +38,11 @@ int lt__buffer_resize(int w, int h) {
   lt__g.back = base;
   lt__g.front = base + n;
 
-  lt__g.width = w;
-  lt__g.height = h;
+  if (lt__g.width != w)
+    lt__g.width = w;
+
+  if (lt__g.height != h)
+    lt__g.height = h;
 
   lt__buffer_clear(lt__g.back, (int)n, lt__g.clear_fg, lt__g.clear_bg);
   lt__buffer_clear(lt__g.front, (int)n, lt__g.clear_fg, lt__g.clear_bg);
@@ -64,9 +71,5 @@ void lt__buffer_free(void) {
 }
 
 void lt__buffer_clear(struct lt_cell *buf, int count, lt_attr fg, lt_attr bg) {
-  for (int i = 0; i < count; i++) {
-    buf[i].ch = ' ';
-    buf[i].fg = fg;
-    buf[i].bg = bg;
-  }
+  lt__simd_fill_cells(buf, count, fg, bg);
 }

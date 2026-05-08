@@ -124,6 +124,7 @@ struct lt_cell {
   lt_uchar ch;
   lt_attr fg;
   lt_attr bg;
+  uint32_t _reserved; /* pad to 16 B, cell-aligned for SIMD scans */
 };
 
 struct lt_event {
