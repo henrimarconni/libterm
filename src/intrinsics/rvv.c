@@ -55,3 +55,14 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
   }
   return count;
 }
+
+/* Scalar fallback for now; RVV broadcast-and-store left as a follow-up. */
+void lt__simd_fill_cells(struct lt_cell *buf, int count, lt_attr fg,
+                         lt_attr bg) {
+  for (int i = 0; i < count; i++) {
+    buf[i].ch = ' ';
+    buf[i].fg = fg;
+    buf[i].bg = bg;
+    buf[i]._reserved = 0;
+  }
+}

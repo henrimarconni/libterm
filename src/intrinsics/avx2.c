@@ -16,10 +16,10 @@
 #include <immintrin.h>
 #include <stdint.h>
 
-/* Cell layout: {u32 ch, u32 fg, u32 bg} = 12 bytes. AVX2 ymm = 32 bytes
- * They don't devide cleanly, but byte-equal across [0, b) implies cell-equal
- * for cells fully in [0, b). So byte-level SIMD scan + (byte_idx / 12) gives
- * a correct first-differing-cell index. */
+/* Cell layout: {u32 ch, u32 fg, u32 bg, u32 _reserved} = 16 bytes.
+ * AVX2 ymm = 32 bytes = 2 cells exactly. Byte-equal across [0, b)
+ * implies cell-equal for cells fully in [0, b); byte-level SIMD scan
+ * + (byte_idx / 16) gives the correct first-differing-cell index. */
 
 int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
                                     const struct lt_cell *b, int count) {
@@ -48,16 +48,62 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
   return count;
 }
 
-/* Note: byte-level "first equal" doesn't translate to cell-level, a single
- * matching byte in a partly-matching cell would be a false positive. For
- * correctnexx we walk cell-by-cell with scalar 3-field equality. The inner
- * phase usage in lt_present is N=run_length, typically small, so scalar is
- * acceptable. Cell-aligned SIMD reduction is a future optimization. */
+/* AVX2 first-equal-cell: 16-byte cells x 2 per ymm. A cell is equal iff
+ * its 16 movemask bits are all set. Relies on Step E's invariant that
+ * `_reserved` is 0 in both buffers, which makes 16-byte byte-equality
+ * equivalent to field-equality. */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
-  for (int i = 0; i < count; i++) {
-    if (a[i].ch != b[i].ch || a[i].fg != b[i].fg || a[i].bg != b[i].bg)
+  if (count <= 0)
+    return count;
+
+  const char *pa = (const char *)a;
+  const char *pb = (const char *)b;
+  int pairs = count / 2;
+
+  for (int p = 0; p < pairs; p++) {
+    __m256i va = _mm256_loadu_si256((const __m256i *)(pa + p * 32));
+    __m256i vb = _mm256_loadu_si256((const __m256i *)(pb + p * 32));
+    uint32_t eq = (uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(va, vb));
+
+    if ((eq & 0x0000FFFFu) == 0x0000FFFFu)
+      return p * 2;
+    if ((eq & 0xFFFF0000u) == 0xFFFF0000u)
+      return p * 2 + 1;
+  }
+
+  int i = pairs * 2;
+  if (i < count) {
+    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg)
       return i;
   }
+
   return count;
+}
+
+/* AVX2 fill: broadcast a 16-byte cell template into a ymm (= 2 cells)
+ * and store 32 bytes per iteration. Tail handled scalar. */
+void lt__simd_fill_cells(struct lt_cell *buf, int count, lt_attr fg,
+                         lt_attr bg) {
+  if (count <= 0)
+    return;
+
+  struct lt_cell tmpl = {
+      .ch = ' ',
+      .fg = fg,
+      .bg = bg,
+      ._reserved = 0,
+  };
+  __m128i x = _mm_loadu_si128((const __m128i *)&tmpl);
+  __m256i v = _mm256_broadcastsi128_si256(x);
+
+  char *p = (char *)buf;
+  int pairs = count / 2;
+
+  for (int i = 0; i < pairs; i++)
+    _mm256_storeu_si256((__m256i *)(p + i * 32), v);
+
+  int tail = pairs * 2;
+  for (int i = tail; i < count; i++)
+    buf[i] = tmpl;
 }

@@ -22,4 +22,9 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count);
 
+/* Fill `count` cells with the template (ch=' ', given fg/bg, _reserved=0).
+ * Implementations may use SIMD broadcast-and-store. count must be >= 0. */
+void lt__simd_fill_cells(struct lt_cell *buf, int count, lt_attr fg,
+                         lt_attr bg);
+
 #endif /* LIBTERM_INTRINSICS_DIFF_H */
