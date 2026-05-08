@@ -26,3 +26,5 @@ external/
 /.omx
 /package-lock.json
 /docs
+/.claude
+CLAUDE.md 

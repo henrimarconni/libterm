@@ -12,10 +12,13 @@
 /* ---- global state (single terminal instance) ---- */
 struct lt__state {
   bool initialized;
+  bool *dirty_rows;
   int width;
   int height;
   int input_mode;
   int output_mode;
+  int cur_x;
+  int cur_y;
   lt_attr clear_fg;
   lt_attr clear_bg;
   struct lt_cell *back;  /* back buffer  (w*h cells) */

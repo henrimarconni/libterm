@@ -1,5 +1,6 @@
 #define ARENA_IMPLEMENTATION
 #include "internal.h"
+#include "intrinsics/diff.h"
 #include "lib/arena.h"
 #include <stdlib.h>
 
@@ -9,8 +10,11 @@ int lt__buffer_resize(int w, int h) {
   if (w <= 0 || h <= 0)
     return LT_ERR;
 
+  if (lt__g.width == w && lt__g.height == h)
+    return LT_OK;
+
   const size_t n = (size_t)(w * h);
-  if (n == 0 || n > (SIZE_MAX / sizeof(struct lt_cell)))
+  if (n == 0 || n > (SIZE_MAX / (2 * sizeof(struct lt_cell))))
     return LT_ERR_MEM;
 
   const size_t cells_bytes = n * sizeof(struct lt_cell);
@@ -27,18 +31,29 @@ int lt__buffer_resize(int w, int h) {
   arena_reset(lt__g.arena);
 
   struct lt_cell *base =
-      arena_alloc(lt__g.arena, cells_bytes, ARENA_ALIGNOF(struct lt_cell));
+      arena_alloc(lt__g.arena, cells_bytes * 2, ARENA_ALIGNOF(struct lt_cell));
   if (!base)
     return LT_ERR_MEM;
 
   lt__g.back = base;
   lt__g.front = base + n;
 
-  lt__g.width = w;
-  lt__g.height = h;
+  if (lt__g.width != w)
+    lt__g.width = w;
+
+  if (lt__g.height != h)
+    lt__g.height = h;
 
   lt__buffer_clear(lt__g.back, (int)n, lt__g.clear_fg, lt__g.clear_bg);
   lt__buffer_clear(lt__g.front, (int)n, lt__g.clear_fg, lt__g.clear_bg);
+
+  lt__g.dirty_rows =
+      arena_alloc(lt__g.arena, (size_t)h * sizeof(bool), ARENA_ALIGNOF(bool));
+  if (!lt__g.dirty_rows)
+    return LT_ERR_MEM;
+
+  for (int i = 0; i < h; i++)
+    lt__g.dirty_rows[i] = true;
 
   return LT_OK;
 }
@@ -50,14 +65,11 @@ void lt__buffer_free(void) {
   lt__g.arena = NULL;
   lt__g.back = NULL;
   lt__g.front = NULL;
+  lt__g.dirty_rows = NULL;
   lt__g.width = 0;
   lt__g.height = 0;
 }
 
 void lt__buffer_clear(struct lt_cell *buf, int count, lt_attr fg, lt_attr bg) {
-  for (int i = 0; i < count; i++) {
-    buf[i].ch = ' ';
-    buf[i].fg = fg;
-    buf[i].bg = bg;
-  }
+  lt__simd_fill_cells(buf, count, fg, bg);
 }
