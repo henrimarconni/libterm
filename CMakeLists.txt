@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(LIBTERM_BUILD_SHARED   "Build shared library"       ON)
 option(LIBTERM_BUILD_STATIC   "Build static library"       ON)
 option(LIBTERM_BUILD_EXAMPLES "Build example programs"     ON)
+option(LIBTERM_BUILD_BENCH    "Build benchmark programs"   ON)
 option(LIBTERM_BUILD_TESTS    "Build unit tests"           ON)
 option(LIBTERM_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 
@@ -22,6 +23,10 @@ add_subdirectory(src)
 
 if(LIBTERM_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(LIBTERM_BUILD_BENCH)
+    add_subdirectory(bench)
 endif()
 
 if(LIBTERM_BUILD_TESTS)
