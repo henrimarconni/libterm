@@ -1,6 +1,7 @@
 #include "internal.h"
 #include "intrinsics/diff.h"
 #include "platform.h"
+#include "string.h"
 
 static int lt__present_abort(int err) {
   static const char sync_end[] = "\x1b[?2026l";
