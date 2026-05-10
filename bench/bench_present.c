@@ -1,13 +1,15 @@
+#if defined(_WIN32)
+#include <profileapi.h>
+#include <windows.h>
+#else
+#define _POSIX_C_SOURCE 200809L
+#include <time.h>
+#endif
+
 #include "libterm/libterm.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-
-#if defined(_WIN32)
-#include <profileapi.h>
-#include <windows.h>
-#endif
 
 typedef void (*workload_fn)(int frame_index);
 
