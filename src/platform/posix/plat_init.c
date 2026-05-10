@@ -1,11 +1,110 @@
-#include "../../internal.h"
-#include "../../platform.h"
+#define _DEFAULT_SOURCE
+#include <termios.h>
 
-/* TODO: open /dev/tty, save termios, set raw mode, install SIGWINCH handler */
-int lt__plat_init(void) { return LT_OK; }
-int lt__plat_shutdown(void) { return LT_OK; }
+#include "libterm/libterm.h"
+#include "platform.h"
+#include "posix_internal.h"
+#include "posix_resize.h"
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
+static int lt__posix_tty_fd = -1;
+static struct termios lt__posix_orig_tios;
+static int lt__posix_has_orig_tios = 0;
+
+int lt__posix_get_tty_fd(void) { return lt__posix_tty_fd; }
+
+int lt__plat_init(void) {
+  if (lt__posix_tty_fd >= 0)
+    return LT_ERR_INIT_ALREADY;
+
+  lt__posix_tty_fd = open("/dev/tty", O_RDWR);
+  if (lt__posix_tty_fd < 0)
+    return LT_ERR_INIT_OPEN;
+
+  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0) {
+    close(lt__posix_tty_fd);
+    lt__posix_tty_fd = -1;
+    return LT_ERR_INIT_OPEN;
+  }
+
+  lt__posix_has_orig_tios = 1;
+
+  struct termios raw = lt__posix_orig_tios;
+  cfmakeraw(&raw);
+  raw.c_cc[VMIN] = 1;
+  raw.c_cc[VTIME] = 0;
+  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0) {
+    close(lt__posix_tty_fd);
+    lt__posix_tty_fd = -1;
+    return LT_ERR_INIT_OPEN;
+  }
+
+  int rrc = lt__posix_resize_init();
+  if (rrc != LT_OK) {
+    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+    close(lt__posix_tty_fd);
+    lt__posix_tty_fd = -1;
+    lt__posix_has_orig_tios = 0;
+    return rrc;
+  }
+
+  static const char enter_alt[] = "\x1b[?1049h";
+  if (lt__plat_write(enter_alt, sizeof(enter_alt) - 1) != LT_OK) {
+    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+    close(lt__posix_tty_fd);
+    lt__posix_tty_fd = -1;
+    lt__posix_has_orig_tios = 0;
+    return LT_ERR_INIT_OPEN;
+  }
+
+  if (lt__plat_flush() != LT_OK) {
+    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+    close(lt__posix_tty_fd);
+    lt__posix_tty_fd = -1;
+    lt__posix_has_orig_tios = 0;
+    return LT_ERR_INIT_OPEN;
+  }
+
+  return LT_OK;
+}
+
+int lt__plat_shutdown(void) {
+  if (lt__posix_tty_fd >= 0) {
+    (void)lt__plat_show_cursor();
+    static const char leave_alt[] = "\x1b[?1049l";
+    (void)lt__plat_write(leave_alt, sizeof(leave_alt) - 1);
+    (void)lt__plat_flush();
+    (void)lt__posix_resize_shutdown();
+
+    if (lt__posix_has_orig_tios) {
+      (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+    }
+
+    close(lt__posix_tty_fd);
+  }
+
+  lt__posix_tty_fd = -1;
+  lt__posix_has_orig_tios = 0;
+  return LT_OK;
+}
+
 int lt__plat_get_size(int *w, int *h) {
-  *w = 80;
-  *h = 24;
+  if (!w || !h)
+    return LT_ERR;
+
+  if (lt__posix_tty_fd < 0)
+    return LT_ERR;
+
+  struct winsize ws;
+  if (ioctl(lt__posix_tty_fd, TIOCGWINSZ, &ws) != 0)
+    return LT_ERR;
+
+  if (ws.ws_col <= 0 || ws.ws_row <= 0)
+    return LT_ERR;
+
+  *w = (int)ws.ws_col;
+  *h = (int)ws.ws_row;
   return LT_OK;
 }
