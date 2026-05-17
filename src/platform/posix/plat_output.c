@@ -10,6 +10,13 @@ static char lt__outbuf[LT__OUTBUF_CAP];
 static size_t lt__outbuf_len = 0;
 
 static int lt__posix_raw_write(const char *buf, size_t len) {
+
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  (void)buf;
+  (void)len;
+  return LT_OK;
+#endif
+
   int ttyfd = lt__posix_get_tty_fd();
   if (ttyfd < 0)
     return LT_ERR;
@@ -39,7 +46,12 @@ static char *lt__plat_reserve(size_t max) {
   return lt__outbuf + lt__outbuf_len;
 }
 
-static void lt__plat_commit(size_t actual) { lt__outbuf_len += actual; }
+static void lt__plat_commit(size_t actual) {
+#if LT_RENDER_STATS
+  lt__g.stats.bytes_buffered += (uint64_t)actual;
+#endif
+  lt__outbuf_len += actual;
+}
 
 static int lt__posix_write_uint(char *buf, int v) {
   if (v < 0)
@@ -82,6 +94,9 @@ int lt__plat_write(const char *buf, size_t len) {
   }
 
   memcpy(lt__outbuf + lt__outbuf_len, buf, len);
+#if LT_RENDER_STATS
+  lt__g.stats.bytes_buffered += (uint64_t)len;
+#endif
   lt__outbuf_len += len;
   return LT_OK;
 }
@@ -89,6 +104,10 @@ int lt__plat_write(const char *buf, size_t len) {
 int lt__plat_flush(void) {
   if (lt__outbuf_len == 0)
     return LT_OK;
+
+#if LT_RENDER_STATS
+  lt__g.stats.flushes++;
+#endif
 
   int rc = lt__posix_raw_write(lt__outbuf, lt__outbuf_len);
   lt__outbuf_len = 0;

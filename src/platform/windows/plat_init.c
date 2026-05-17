@@ -4,6 +4,14 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#ifndef LIBTERM_BENCH_WIDTH
+#define LIBTERM_BENCH_WIDTH 40
+#endif
+
+#ifndef LIBTERM_BENCH_HEIGHT
+#define LIBTERM_BENCH_HEIGHT 12
+#endif
+
 static HANDLE lt__win_in = INVALID_HANDLE_VALUE;
 static HANDLE lt__win_out = INVALID_HANDLE_VALUE;
 static DWORD lt__win_in_mode_orig = 0;
@@ -15,6 +23,10 @@ static int lt__win_is_bad_handle(HANDLE h) {
 }
 
 int lt__plat_init(void) {
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  return LT_OK;
+#endif
+
   lt__win_in = GetStdHandle(STD_INPUT_HANDLE);
   lt__win_out = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -66,6 +78,10 @@ int lt__plat_init(void) {
 }
 
 int lt__plat_shutdown(void) {
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  return LT_OK;
+#endif
+
   if (lt__win_modes_saved) {
     (void)lt__plat_show_cursor(); /* restore cursor visibility (in alt) */
     static const char leave_alt[] = "\x1b[?1049l";
@@ -86,6 +102,12 @@ int lt__plat_shutdown(void) {
 int lt__plat_get_size(int *w, int *h) {
   if (!w || !h)
     return LT_ERR;
+
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  *w = LIBTERM_BENCH_WIDTH;
+  *h = LIBTERM_BENCH_HEIGHT;
+  return LT_OK;
+#endif
 
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   if (!GetConsoleScreenBufferInfo(lt__win_out, &csbi))

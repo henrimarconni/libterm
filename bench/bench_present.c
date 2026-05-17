@@ -6,10 +6,19 @@
 #include <time.h>
 #endif
 
-#include "libterm/libterm.h"
+#include "internal.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#ifndef LIBTERM_BENCH_WIDTH
+#define LIBTERM_BENCH_WIDTH 40
+#endif
+
+#ifndef LIBTERM_BENCH_HEIGHT
+#define LIBTERM_BENCH_HEIGHT 12
+#endif
 
 typedef void (*workload_fn)(int frame_index);
 
@@ -24,23 +33,36 @@ static void workload_baseline(int frame_index) {
 }
 
 static void workload_sparse(int frame_index) {
-  int x0 = frame_index % 40;
-  int y0 = frame_index % 12;
+  int x0 = frame_index % LIBTERM_BENCH_WIDTH;
+  int y0 = frame_index % LIBTERM_BENCH_HEIGHT;
 
   lt_set_cell(x0, y0, 'A', LT_DEFAULT, LT_DEFAULT);
-  lt_set_cell((x0 + 1) % 40, y0, 'B', LT_DEFAULT, LT_DEFAULT);
-  lt_set_cell(x0, (y0 + 1) % 12, 'C', LT_DEFAULT, LT_DEFAULT);
-  lt_set_cell((x0 + 1) % 40, (y0 + 1) % 12, 'D', LT_DEFAULT, LT_DEFAULT);
+  lt_set_cell((x0 + 1) % LIBTERM_BENCH_WIDTH, y0, 'B', LT_DEFAULT, LT_DEFAULT);
+  lt_set_cell(x0, (y0 + 1) % LIBTERM_BENCH_HEIGHT, 'C', LT_DEFAULT, LT_DEFAULT);
+  lt_set_cell((x0 + 1) % LIBTERM_BENCH_WIDTH, (y0 + 1) % LIBTERM_BENCH_HEIGHT,
+              'D', LT_DEFAULT, LT_DEFAULT);
 
   lt_present();
 
   g_sink += (uint64_t)(frame_index & 1);
 }
 
-static void workload_full(int frame_index) { lt_present(); }
+static void workload_full(int frame_index) {
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
+  char ch = (char)('A' + (frame_index & 15));
+
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      lt_set_cell(x, y, ch, LT_DEFAULT, LT_DEFAULT);
+    }
+  }
+
+  lt_present();
+  g_sink += (uint64_t)(frame_index & 1);
+}
 
 static void workload_box_redraw(int frame_index) {
-  const int w = 40, h = 12;
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
 
   for (int x = 0; x < w; x++) {
     lt_set_cell(x, 0, '-', LT_DEFAULT, LT_DEFAULT);
@@ -97,20 +119,57 @@ static const struct workload_case k_workloads[] = {
     {"box_redraw", workload_box_redraw},
 };
 
+#define k_workloads_count (sizeof(k_workloads) / sizeof(k_workloads[0]))
+
 struct case_result {
   const char *name;
   double us_per_frame;
   double fps;
   double p50_us;
   double p95_us;
+  struct lt__render_stats stats;
 };
 
-int main() {
+static void print_usage(const char *program) {
+  fprintf(stderr, "usage: %s [all", program);
+  for (int i = 0; i < (int)k_workloads_count; i++)
+    fprintf(stderr, "|%s", k_workloads[i].name);
+  fprintf(stderr, "]\n");
+}
+
+static int select_workload_range(int argc, char *argv[], int *start, int *end) {
+  int count = k_workloads_count;
+
+  *start = 0;
+  *end = count;
+
+  if (argc < 2 || strcmp(argv[1], "all") == 0)
+    return 0;
+
+  for (int i = 0; i < count; i++) {
+    if (strcmp(argv[1], k_workloads[i].name) == 0) {
+      *start = i;
+      *end = i + 1;
+      return 0;
+    }
+  }
+
+  print_usage(argv[0]);
+  return 2;
+}
+
+int main(int argc, char *argv[]) {
+
   const int warmup_frames = 20000;
   const int measure_frames = 10000;
   const int sample_frames = 2000;
+
+  int start = 0, end = 0;
+  int select_rc = select_workload_range(argc, argv, &start, &end);
+  if (select_rc != 0)
+    return select_rc;
+
   uint64_t frame_ns[2000];
-  int k_workloads_count = sizeof(k_workloads) / sizeof(k_workloads[0]);
 
   int rc = lt_init();
   if (rc != 0) {
@@ -121,13 +180,13 @@ int main() {
   struct workload_case active = {0};
   struct case_result results[k_workloads_count];
 
-  double biggest_upf = 0.0f;
-
-  for (int i = 0; i < k_workloads_count; i++) {
+  for (int i = start; i < end; i++) {
     active = k_workloads[i];
     for (int i = 0; i < warmup_frames; i++) {
       active.fn(i);
     }
+
+    lt__g.stats = (struct lt__render_stats){0};
 
     uint64_t t0 = now_ns();
     for (int i = 0; i < measure_frames; i++) {
@@ -151,29 +210,26 @@ int main() {
     results[i].fps = fps;
     results[i].p50_us = p50_us;
     results[i].p95_us = p95_us;
-
-    double limit = us_per_frame * 1.15;
-    if (limit < biggest_upf)
-      biggest_upf = limit;
-
-    if (p95_us < biggest_upf) {
-      fprintf(
-          stderr,
-          "fail: workload=%s us_per_frame=%.3f, biggest_upf=%.3f p95_us=%.3f\n",
-          active.name, us_per_frame, biggest_upf, p95_us);
-      return 1;
-    }
+    results[i].stats = lt__g.stats;
   }
 
   lt_shutdown();
 
-  printf("%-12s %12s %12s %10s %10s %10s\n", "name", "us_per_frame", "fps",
-         "p50_us", "p95_us", "sink");
+  printf("%-12s %12s %12s %10s %10s %10s %10s %10s %10s %10s %10s\n", "name",
+         "us_per_frame", "fps", "p50_us", "p95_us", "runs", "cells", "moves",
+         "bytes", "flushes", "sink");
 
-  for (int i = 0; i < k_workloads_count; i++) {
-    printf("%-12s %12.3f %12.1f %10.3f %10.3f %10llu\n", results[i].name,
-           results[i].us_per_frame, results[i].fps, results[i].p50_us,
-           results[i].p95_us, (unsigned long long)g_sink);
+  for (int i = start; i < end; i++) {
+    printf("%-12s %12.3f %12.1f %10.3f %10.3f %10llu %10llu %10llu %10llu "
+           "%10llu %10llu\n",
+           results[i].name, results[i].us_per_frame, results[i].fps,
+           results[i].p50_us, results[i].p95_us,
+           (unsigned long long)results[i].stats.diff_runs,
+           (unsigned long long)results[i].stats.cells_rendered,
+           (unsigned long long)results[i].stats.cursor_moves,
+           (unsigned long long)results[i].stats.bytes_buffered,
+           (unsigned long long)results[i].stats.flushes,
+           (unsigned long long)g_sink);
   }
   return 0;
 }

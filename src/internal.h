@@ -9,7 +9,27 @@
 #include "libterm/libterm.h"
 #include <stdbool.h>
 
+#if defined(LIBTERM_ENABLE_RENDER_STATS)
+#include <stdint.h>
+#define LT_RENDER_STATS 1
+#else
+#define LT_RENDER_STATS 0
+#endif
+
+#if LT_RENDER_STATS
+struct lt__render_stats {
+  uint64_t present_calls;
+  uint64_t dirty_rows;
+  uint64_t diff_runs;
+  uint64_t cursor_moves;
+  uint64_t cells_rendered;
+  uint64_t bytes_buffered;
+  uint64_t flushes;
+};
+#endif
+
 /* ---- global state (single terminal instance) ---- */
+
 struct lt__state {
   bool initialized;
   bool *dirty_rows;
@@ -23,7 +43,10 @@ struct lt__state {
   lt_attr clear_bg;
   struct lt_cell *back;  /* back buffer  (w*h cells) */
   struct lt_cell *front; /* front buffer (w*h cells) */
-  Arena *arena;          /* arena for back/front buffers */
+#if LT_RENDER_STATS
+  struct lt__render_stats stats;
+#endif
+  Arena *arena; /* arena for back/front buffers */
 };
 
 extern struct lt__state lt__g;

@@ -51,6 +51,10 @@ int lt_present(void) {
   if (!any_dirty)
     return lt__plat_flush();
 
+#if LT_RENDER_STATS
+  lt__g.stats.present_calls++;
+#endif
+
   /* Begin syncronized update (DEC mode 2026). Terminals that don't
    * recognize this DECSET silently ignore it. Modern terminals atomically
    * swap to the new frame at the matching end-sync bellow, killing tearing
@@ -67,6 +71,10 @@ int lt_present(void) {
   for (int y = 0; y < lt__g.height; y++) {
     if (!lt__g.dirty_rows[y])
       continue;
+
+#if LT_RENDER_STATS
+    lt__g.stats.dirty_rows++;
+#endif
 
     int x = 0;
     while (x < lt__g.width) {
@@ -85,13 +93,19 @@ int lt_present(void) {
           &lt__g.back[idx + 1], &lt__g.front[idx + 1], lt__g.width - x - 1);
       run_len = 1 + rest;
       run_end = x + run_len;
+#if LT_RENDER_STATS
+      lt__g.stats.diff_runs++;
+      lt__g.stats.cells_rendered += (uint64_t)run_len;
+#endif
 
       /* emit cursor jump if discontinuous from cache */
       if (x != lt__g.cur_x || y != lt__g.cur_y) {
         mc = lt__plat_move_cursor(x, y);
-        if (mc != LT_OK) {
+        if (mc != LT_OK)
           return lt__present_abort(mc);
-        }
+#if LT_RENDER_STATS
+        lt__g.stats.cursor_moves++;
+#endif
       }
 
       /* emit the entire run in one block */

@@ -28,11 +28,23 @@ static char *lt__plat_reserve(size_t max) {
   return lt__outbuf + lt__outbuf_len;
 }
 
-static void lt__plat_commit(size_t actual) { lt__outbuf_len += actual; }
+static void lt__plat_commit(size_t actual) {
+#if LT_RENDER_STATS
+  lt__g.stats.bytes_buffered += (uint64_t)actual;
+#endif
+
+  lt__outbuf_len += actual;
+}
 
 static int lt__win_raw_write(const char *buf, size_t len) {
   if (len == 0)
     return LT_OK;
+
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  (void)buf;
+  (void)len;
+  return LT_OK;
+#endif
 
   HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
   if (out == NULL || out == INVALID_HANDLE_VALUE)
@@ -88,6 +100,10 @@ int lt__plat_write(const char *buf, size_t len) {
       return rc;
   }
 
+#if LT_RENDER_STATS
+  lt__g.stats.bytes_buffered += (uint64_t)len;
+#endif
+
   memcpy(lt__outbuf + lt__outbuf_len, buf, len);
   lt__outbuf_len += len;
 
@@ -97,6 +113,10 @@ int lt__plat_write(const char *buf, size_t len) {
 int lt__plat_flush(void) {
   if (lt__outbuf_len == 0)
     return LT_OK;
+
+#if LT_RENDER_STATS
+  lt__g.stats.flushes++;
+#endif
 
   int rc = lt__win_raw_write(lt__outbuf, lt__outbuf_len);
   lt__outbuf_len = 0;

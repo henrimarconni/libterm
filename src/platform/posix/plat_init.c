@@ -9,6 +9,14 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#ifndef LIBTERM_BENCH_WIDTH
+#define LIBTERM_BENCH_WIDTH 40
+#endif
+
+#ifndef LIBTERM_BENCH_HEIGHT
+#define LIBTERM_BENCH_HEIGHT 12
+#endif
+
 static int lt__posix_tty_fd = -1;
 static struct termios lt__posix_orig_tios;
 static int lt__posix_has_orig_tios = 0;
@@ -16,6 +24,10 @@ static int lt__posix_has_orig_tios = 0;
 int lt__posix_get_tty_fd(void) { return lt__posix_tty_fd; }
 
 int lt__plat_init(void) {
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  return LT_OK;
+#endif
+
   if (lt__posix_tty_fd >= 0)
     return LT_ERR_INIT_ALREADY;
 
@@ -71,6 +83,10 @@ int lt__plat_init(void) {
 }
 
 int lt__plat_shutdown(void) {
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  return LT_OK;
+#endif
+
   if (lt__posix_tty_fd >= 0) {
     (void)lt__plat_show_cursor();
     static const char leave_alt[] = "\x1b[?1049l";
@@ -93,6 +109,12 @@ int lt__plat_shutdown(void) {
 int lt__plat_get_size(int *w, int *h) {
   if (!w || !h)
     return LT_ERR;
+
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  *w = LIBTERM_BENCH_WIDTH;
+  *h = LIBTERM_BENCH_HEIGHT;
+  return LT_OK;
+#endif
 
   if (lt__posix_tty_fd < 0)
     return LT_ERR;
