@@ -5,6 +5,7 @@
 int main(void) {
   if (lt_init() != LT_OK)
     return 1;
+
   for (;;) {
     struct lt_event ev;
     if (lt_poll_event(&ev) != LT_OK)
