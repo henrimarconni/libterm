@@ -1,0 +1,19 @@
+{
+  "topic": "refterm-optimization-study",
+  "mode": "concept",
+  "status": "in_progress",
+  "started": "2026-05-15",
+  "layers_total": 6,
+  "layers_completed": 5,
+  "current_phase": "phase4",
+  "current_layer": 5,
+  "revision_id": 0,
+  "errors_this_session": 0,
+  "entries_this_session": 0,
+  "unapplied_gaps": [
+    "Use refterm-inspired measurements to choose lt_present optimization"
+  ],
+  "refs": [
+    "external/refterm"
+  ]
+}

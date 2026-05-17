@@ -1,0 +1,20 @@
+{
+  "topic": "post-utf8-wrapup",
+  "mode": "concept",
+  "status": "in_progress",
+  "started": "2026-05-15",
+  "layers_total": 8,
+  "layers_completed": 6,
+  "current_phase": "phase5",
+  "current_layer": 6,
+  "revision_id": 0,
+  "errors_this_session": 0,
+  "entries_this_session": 0,
+  "unapplied_gaps": [
+    "Broaden parser tests (negative cases + more modifier combinations)",
+    "Choose next parity block after input parser hardening"
+  ],
+  "refs": [
+    "termbox2"
+  ]
+}
