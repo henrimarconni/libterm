@@ -14,11 +14,11 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_init` | `lt_init` | [~] | [x] | POSIX `lt__plat_init` is a no-op (no termios raw-mode entry yet). Windows enters raw mode + alt-screen (`\x1b[?1049h`) so prior scrollback is preserved across the libterm session |
+| `tb_init` | `lt_init` | [x] | [x] | POSIX now opens `/dev/tty`, enters raw mode, enters alt-screen, and initializes SIGWINCH self-pipe. Windows enters raw mode + alt-screen (`\x1b[?1049h`) so prior scrollback is preserved across the libterm session |
 | `tb_init_file` | `lt_init_file` | [ ] | [ ] | Not declared in `libterm.h` |
 | `tb_init_fd` | `lt_init_fd` | [ ] | [—] | Not declared |
 | `tb_init_rwfd` | `lt_init_rwfd` | [ ] | [—] | Not declared |
-| `tb_shutdown` | `lt_shutdown` | [~] | [x] | POSIX shutdown does not restore termios (init never entered raw mode). Windows leaves alt-screen (`\x1b[?1049l`) after cursor-show + flush, then restores both console modes |
+| `tb_shutdown` | `lt_shutdown` | [x] | [x] | POSIX restores cursor visibility, leaves alt-screen, restores saved termios, tears down resize pipe/signal state, and closes tty fd. Windows leaves alt-screen (`\x1b[?1049l`) after cursor-show + flush, then restores both console modes |
 
 ### Screen geometry & rendering
 
@@ -28,11 +28,11 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_height` | `lt_height` | [x] | [x] | Reads cached `lt__g.height` |
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
 | `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | |
-| `tb_present` | `lt_present` | [~] | [x] | Shared diff loop skips cells where `back == front` (3-field equality). Windows path also caches last-emitted cursor position (`lt__g.cur_x` / `cur_y`) so adjacent changed cells skip the cursor jump, and drains the entire frame in one `WriteFile`. POSIX `lt__plat_render_cell` / `move_cursor` / `flush` are still no-ops, so nothing reaches the screen there |
+| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX and Windows both have active cursor/render/flush sinks; SGR/color emission is still pending so output is currently glyph-focused |
 | `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
-| `tb_set_cursor` | `lt_set_cursor` | [~] | [x] | POSIX `lt__plat_move_cursor` is a no-op. Windows uses a hand-rolled int-to-decimal writer for `\x1b[r;cH` formatting (no `snprintf`/`printf`-family in the render hot path) |
-| `tb_hide_cursor` | `lt_hide_cursor` | [~] | [x] | POSIX `lt__plat_hide_cursor` is a no-op |
-| *(libterm addition)* | `lt_show_cursor` | [~] | [x] | Mirror of `lt_hide_cursor`; POSIX path is a no-op |
+| `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
+| `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
+| *(libterm addition)* | `lt_show_cursor` | [x] | [x] | Mirror of `lt_hide_cursor` |
 | `tb_set_cell` | `lt_set_cell` | [x] | [x] | Bounds-checked write into back buffer |
 | `tb_set_cell_ex` | `lt_set_cell_ex` | [ ] | [ ] | Not declared (multi-codepoint EGC variant) |
 | `tb_extend_cell` | `lt_extend_cell` | [ ] | [ ] | Not declared |
@@ -42,7 +42,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX reads single bytes only; ESC sequences, named keys beyond arrows, modifiers, UTF-8 assembly all missing |
+| `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX now handles arrows, Home/End, Insert/Delete, PgUp/PgDn, F1–F12, CSI modifier forms, SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback; parity edge-cases across terminals still remain |
 | `tb_peek_event` | `lt_peek_event` | [~] | [x] | Same caveats as `lt_poll_event` |
 | `tb_get_fds` | `lt_get_fds` | [ ] | [—] | Not declared |
 | `tb_set_input_mode` | `lt_set_input_mode` | [~] | [~] | Stores the flag in `lt__g`; nothing in the input path reads it yet |
@@ -78,7 +78,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
 | `tb_last_errno` | `lt_last_errno` | [ ] | [ ] | |
-| `tb_strerror` | `lt_strerror` | [ ] | [ ] | Declared in `libterm.h`; no implementation linked |
+| `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for currently used error codes |
 | `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | |
 | `tb_has_egc` | `lt_has_egc` | [ ] | [ ] | |
 | `tb_attr_width` | `lt_attr_width` | [ ] | [ ] | |
@@ -100,7 +100,7 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 | `TB_ERR` | `LT_ERR` | [x] | [x] |
 | `TB_ERR_NEED_MORE` | `LT_ERR_NEED_MORE` | [x] | [x] |
 | `TB_ERR_INIT_ALREADY` | `LT_ERR_INIT_ALREADY` | [x] | [x] |
-| `TB_ERR_INIT_OPEN` | `LT_ERR_INIT_OPEN` | [x] | [ ] |
+| `TB_ERR_INIT_OPEN` | `LT_ERR_INIT_OPEN` | [x] | [x] |
 | `TB_ERR_MEM` | `LT_ERR_MEM` | [x] | [x] |
 | `TB_ERR_NO_EVENT` | `LT_ERR_NO_EVENT` | [x] | [x] |
 | `TB_ERR_NO_TERM` | `LT_ERR_NO_TERM` | [x] | [ ] |
@@ -110,7 +110,7 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 | `TB_ERR_RESIZE_IOCTL` | `LT_ERR_RESIZE_IOCTL` | [x] | [ ] |
 | `TB_ERR_RESIZE_PIPE` | `LT_ERR_RESIZE_PIPE` | [x] | [ ] |
 | `TB_ERR_RESIZE_SIGACTION` | `LT_ERR_RESIZE_SIGACTION` | [x] | [ ] |
-| `TB_ERR_POLL` | `LT_ERR_POLL` | [x] | [ ] |
+| `TB_ERR_POLL` | `LT_ERR_POLL` | [x] | [x] |
 | `TB_ERR_TCGETATTR` | `LT_ERR_TCGETATTR` | [x] | [ ] |
 | `TB_ERR_TCSETATTR` | `LT_ERR_TCSETATTR` | [x] | [ ] |
 | `TB_ERR_UNSUPPORTED_TERM` | `LT_ERR_UNSUPPORTED_TERM` | [x] | [ ] |
@@ -125,7 +125,7 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 | termbox2 | libterm | Status |
 |---|---|---|
 | `TB_EVENT_KEY` | `LT_EVENT_KEY` | declared, emitted (POSIX [~], Windows [x]) |
-| `TB_EVENT_RESIZE` | `LT_EVENT_RESIZE` | declared; only Windows emits it today |
+| `TB_EVENT_RESIZE` | `LT_EVENT_RESIZE` | declared; emitted on both platforms (Windows console resize event, POSIX SIGWINCH/self-pipe path) |
 | `TB_EVENT_MOUSE` | `LT_EVENT_MOUSE` | declared; not emitted on either platform |
 
 ### Keys (`TB_KEY_*` → `LT_KEY_*`)
@@ -135,9 +135,9 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | Key group | POSIX | Windows |
 |---|---|---|
 | Arrows + ESC | [x] | [x] |
-| `ENTER` / `BACKSPACE` / `TAB` / `SPACE` | [~] (raw byte only) | [x] |
-| F1–F12 | [ ] | [x] |
-| `INSERT` / `DELETE` / `HOME` / `END` / `PGUP` / `PGDN` | [ ] | [x] |
+| `ENTER` / `BACKSPACE` / `TAB` / `SPACE` | [~] (raw byte path) | [x] |
+| F1–F12 | [x] (common xterm CSI/SS3 sequences) | [x] |
+| `INSERT` / `DELETE` / `HOME` / `END` / `PGUP` / `PGDN` | [x] | [x] |
 | Ctrl+letter (`TB_KEY_CTRL_A` … termbox2 set) | [ ] | [ ] |
 
 ### Modifiers (`TB_MOD_*` → `LT_MOD_*`)
@@ -192,22 +192,22 @@ A feature is listed here only if it has been observed working on a real terminal
 
 | Capability | POSIX | Windows |
 |---|---|---|
-| `lt_init` / `lt_shutdown` round-trip without leaking handles | [~] init is a no-op stub | [x] saves and restores both console modes |
-| Console size queried from kernel (not env) | [ ] `lt__plat_get_size` returns hardcoded zeros / TODO | [x] `csbi.srWindow`-based viewport size |
+| `lt_init` / `lt_shutdown` round-trip without leaking handles | [x] raw mode + alt-screen + SIGWINCH self-pipe lifecycle | [x] saves and restores both console modes |
+| Console size queried from kernel (not env) | [x] `ioctl(TIOCGWINSZ)` | [x] `csbi.srWindow`-based viewport size |
 | `lt_clear` zeroes the back buffer | [x] | [x] |
 | `lt_set_cell` writes a codepoint into the back buffer | [x] | [x] |
-| `lt_present` actually paints the terminal | [ ] no bytes leave the process | [x] cursor jump (only on discontinuity) + UTF-8 emit per changed cell, single `WriteFile` per frame |
-| ASCII char keys via `lt_poll_event` / `lt_peek_event` | [~] single-byte only; no ESC parser | [x] disambiguated via `KEY_EVENT_RECORD` |
-| Named keys (F1–F12, arrows, Home/End/PgUp/PgDn, Ins/Del) | [~] arrows + ESC only | [x] full set via `plat_keys.c` |
-| Modifier bits in `ev->mod` | [ ] | [x] from `dwControlKeyState` |
-| UTF-8 input round-trip (BMP + supplementary) | [ ] no multi-byte assembly | [x] surrogate pairs combined before emit; latch cleared on every non-completing return path |
-| UTF-8 output round-trip in render path | [ ] render-cell is a stub | [x] `lt__utf8_encode` writes 1–4 bytes |
-| `LT_EVENT_RESIZE` delivered exactly once per visible-size change | [ ] no `SIGWINCH` handler | [x] `WINDOW_BUFFER_SIZE_EVENT` filtered for spurious events |
-| Diff-based `lt_present` (skip unchanged cells) | n/a (no output) | [x] shared loop skips equal cells; first-frame is a wire no-op (back == front from `lt__buffer_resize`) |
-| Cursor-position cache (skip jump on natural advance) | n/a | [x] `(lt__g.cur_x, lt__g.cur_y)` invalidated on present-entry, post-emit-with-wrap-safety, and on resize |
-| Alt-screen UX (prior scrollback preserved on exit) | [ ] | [x] `\x1b[?1049h` on init / `\x1b[?1049l` on shutdown |
-| Hand-rolled int-to-decimal in render path (no `snprintf`) | n/a | [x] `lt__plat_move_cursor` writes digits directly |
-| Bench harness (`examples/bench_present.c`) | n/a | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
+| `lt_present` actually paints the terminal | [x] buffered ANSI output | [x] cursor jump (only on discontinuity) + UTF-8 emit per changed cell, buffered `WriteFile` |
+| ASCII char keys via `lt_poll_event` / `lt_peek_event` | [~] UTF-8 assembly path now active with `U+FFFD` fallback; still needs broader parity validation | [x] disambiguated via `KEY_EVENT_RECORD` |
+| Named keys (F1–F12, arrows, Home/End/PgUp/PgDn, Ins/Del) | [x] common xterm CSI/SS3 coverage (terminal-dependent beyond that set) | [x] full set via `plat_keys.c` |
+| Modifier bits in `ev->mod` | [~] CSI modifier suffixes mapped for POSIX escape-key families; coverage is not yet universal | [x] from `dwControlKeyState` |
+| UTF-8 input round-trip (BMP + supplementary) | [~] multi-byte assembly + strict decode path active in POSIX input parser with `U+FFFD` fallback; needs wider terminal parity checks | [x] surrogate pairs combined before emit; latch cleared on every non-completing return path |
+| UTF-8 output round-trip in render path | [x] `lt__utf8_encode` path active | [x] `lt__utf8_encode` writes 1–4 bytes |
+| `LT_EVENT_RESIZE` delivered exactly once per visible-size change | [~] SIGWINCH/self-pipe enabled; semantics still under parity validation | [x] `WINDOW_BUFFER_SIZE_EVENT` filtered for spurious events |
+| Diff-based `lt_present` (skip unchanged cells) | [x] shared path | [x] shared path |
+| Cursor-position cache (skip jump on natural advance) | [x] shared path | [x] shared path |
+| Alt-screen UX (prior scrollback preserved on exit) | [x] `\x1b[?1049h` / `\x1b[?1049l` | [x] `\x1b[?1049h` on init / `\x1b[?1049l` on shutdown |
+| Hand-rolled int-to-decimal in render path (no `snprintf`) | [x] | [x] `lt__plat_move_cursor` writes digits directly |
+| Bench harness (`examples/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
 | SGR / color emission | [ ] | [ ] |
 | Mouse events | [ ] | [ ] |
 
@@ -217,11 +217,11 @@ A feature is listed here only if it has been observed working on a real terminal
 
 These are the things that, if fixed, would move the largest number of `[~]` rows above to `[x]`.
 
-1. **POSIX raw-mode entry is missing.** `src/platform/posix/plat_init.c` returns `LT_OK` without touching termios; `lt__plat_get_size` does not call `TIOCGWINSZ`. Until this lands, every POSIX render-path and input-path row stays partial regardless of how complete the shared code is.
-2. **POSIX `plat_output.c` is entirely no-ops.** `lt__plat_write` writes to fd 1 directly (no buffering, no flush phase), and `move_cursor` / `clear_screen` / `hide_cursor` / `show_cursor` / `render_cell` do nothing. The shared diff loop in `lt_present` is correct, but it has no sink.
-3. **POSIX input lacks an ESC-sequence parser.** Single-byte reads cannot disambiguate F-keys, modified keys, or paste mode. Until the parser exists, `lt_poll_event` on POSIX cannot reach Windows-side parity.
-4. **No SGR emission anywhere.** `lt__plat_render_cell` ignores `cell->fg` / `cell->bg` on both platforms. Color, attribute bits, and `lt_set_output_mode` all become live the moment this is wired up.
-5. **UTF-8 helpers are private.** `lt__utf8_encode` / `_decode` / `_char_length` are implemented but not re-exported under the public `lt_utf8_*` names termbox2 consumers expect.
+1. **SGR/color emission is still missing on both platforms.** Renderers currently emit glyph bytes without fg/bg/attribute SGR state, so output modes and color constants are largely inert.
+2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
+3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
+4. **Public API surface still trails termbox2.** `lt_init_file/fd/rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared.
+5. **Public UTF-8 helper aliases are still missing.** Internal `lt__utf8_*` helpers exist, but public `lt_utf8_*` compatibility symbols are not exported.
 
 ---
 
