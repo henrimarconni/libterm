@@ -108,6 +108,7 @@ extern "C" {
 #define LT_WHITE 0x0008
 
 /* ---- attributes ---- */
+/* Attribute bits are OR'd into fg only, high bits of bg are ignored */
 #define LT_BOLD 0x0100
 #define LT_UNDERLINE 0x0200
 #define LT_REVERSE 0x0400
@@ -174,6 +175,11 @@ LT_API int lt_set_input_mode(int mode);
 #define LT_OUTPUT_TRUECOLOR 5
 
 LT_API int lt_set_output_mode(int mode);
+
+/* ---- UTF-8 helpers ---- */
+LT_API int lt_utf8_char_length(char c);
+LT_API int lt_utf8_char_to_unicode(uint32_t *out, const char *c);
+LT_API int lt_utf8_unicode_to_char(char *out, uint32_t c);
 
 /* ---- misc ---- */
 LT_API const char *lt_strerror(int code);

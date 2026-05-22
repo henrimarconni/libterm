@@ -17,6 +17,61 @@ static void expect_bad(const unsigned char *s, size_t len) {
 }
 
 int main(void) {
+  assert(lt_utf8_char_length('A') == 1);
+  assert(lt_utf8_char_length((char)0xC2) == 2);
+  assert(lt_utf8_char_length((char)0xE2) == 3);
+  assert(lt_utf8_char_length((char)0xF0) == 4);
+  assert(lt_utf8_char_length((char)0x80) == 0);
+
+  {
+    uint32_t cp = 0;
+    const char s[] = {(char)0xE2, (char)0x82, (char)0xAC, '\0'};
+    assert(lt_utf8_char_to_unicode(&cp, s) == 3);
+    assert(cp == 0x20AC);
+  }
+
+  {
+    char out[5] = {0};
+    assert(lt_utf8_unicode_to_char(out, 0x1F600) == 4);
+    assert((unsigned char)out[0] == 0xF0);
+    assert((unsigned char)out[1] == 0x9F);
+    assert((unsigned char)out[2] == 0x98);
+    assert((unsigned char)out[3] == 0x80);
+    assert(out[4] == '\0');
+  }
+
+  {
+    uint32_t cp = 0xDEADBEEF;
+    assert(lt_utf8_char_to_unicode(&cp, "") == 0);
+    assert(cp == 0xDEADBEEF);
+  }
+
+  {
+    uint32_t cp = 0xDEADBEEF;
+    const char s[] = {(char)0xE2, (char)0x82, '\0'};
+    assert(lt_utf8_char_to_unicode(&cp, s) == -2);
+    assert(cp == 0xDEADBEEF);
+  }
+
+  {
+    uint32_t cp = 0xDEADBEEF;
+    const char s[] = {(char)0xC2, 'A', '\0'};
+    assert(lt_utf8_char_to_unicode(&cp, s) == 0);
+    assert(cp == 0xDEADBEEF);
+  }
+
+  {
+    char out[5] = {'x', 'x', 'x', 'x', 'x'};
+    assert(lt_utf8_unicode_to_char(out, 0xD800) == 0);
+    assert(out[0] == '\0');
+  }
+
+  {
+    char out[5] = {'x', 'x', 'x', 'x', 'x'};
+    assert(lt_utf8_unicode_to_char(out, 0x110000) == 0);
+    assert(out[0] == '\0');
+  }
+
   expect_ok((const unsigned char *)"A", 1, 1, (lt_uchar)'A');
 
   {

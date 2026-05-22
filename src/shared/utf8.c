@@ -134,3 +134,40 @@ int lt__utf8_encode(lt_uchar ch, char out[4]) {
 
   return 0;
 }
+
+int lt_utf8_char_length(char c) { return lt__utf8_char_length(c); }
+
+int lt_utf8_char_to_unicode(uint32_t *out, const char *c) {
+  if (!out || !c || c[0] == '\0')
+    return 0;
+
+  int want = lt__utf8_char_length(c[0]);
+  if (want <= 0)
+    return 0;
+
+  for (int i = 1; i < want; i++)
+    if (c[i] == '\0')
+      return -i;
+
+  lt_uchar decoded = 0;
+  int got = lt__utf8_decode(c, (size_t)want, &decoded);
+  if (got != want)
+    return 0;
+
+  *out = (uint32_t)decoded;
+  return got;
+}
+
+int lt_utf8_unicode_to_char(char *out, uint32_t c) {
+  if (!out)
+    return 0;
+
+  int n = lt__utf8_encode(c, out);
+  if (n <= 0) {
+    out[0] = '\0';
+    return 0;
+  }
+
+  out[n] = '\0';
+  return n;
+}
