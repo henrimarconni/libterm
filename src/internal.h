@@ -39,6 +39,9 @@ struct lt__state {
   int output_mode;
   int cur_x;
   int cur_y;
+  lt_attr cur_fg;    /* SGR cache: last-emitted fg color (low byte) */
+  lt_attr cur_bg;    /* SGR cache: last-emitted bg color (low byte) */
+  lt_attr cur_attrs; /* SGR cache: last-emitted attr bits (high byte of fg) */
   lt_attr clear_fg;
   lt_attr clear_bg;
   struct lt_cell *back;  /* back buffer  (w*h cells) */

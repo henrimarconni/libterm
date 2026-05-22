@@ -27,6 +27,9 @@ int lt_init(void) {
 
   lt__g.cur_x = -1;
   lt__g.cur_y = -1;
+  lt__g.cur_fg = 0xFFFFFFFF;
+  lt__g.cur_bg = 0xFFFFFFFF;
+  lt__g.cur_attrs = 0xFFFFFFFF;
   lt__g.initialized = 1;
   return LT_OK;
 }
@@ -35,7 +38,14 @@ int lt_shutdown(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
   lt__buffer_free();
+
+  static const char sgr_reset[] = "\x1b[0m";
+  (void)lt__plat_write(sgr_reset, sizeof(sgr_reset) - 1);
+
   int rc = lt__plat_shutdown();
+  lt__g.cur_fg = 0xFFFFFFFF;
+  lt__g.cur_bg = 0xFFFFFFFF;
+  lt__g.cur_attrs = 0xFFFFFFFF;
   lt__g.initialized = 0;
   return rc;
 }

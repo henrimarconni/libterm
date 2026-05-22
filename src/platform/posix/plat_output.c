@@ -170,9 +170,91 @@ int lt__plat_render_cell(int x, int y, const struct lt_cell *c) {
   return lt__plat_write(utf8, (size_t)ub);
 }
 
+static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
+  char *p = lt__plat_reserve(32);
+  if (!p)
+    return LT_ERR;
+
+  size_t pos = 0;
+  p[pos++] = '\x1b';
+  p[pos++] = '[';
+  p[pos++] = '0';
+
+  /* fg: 30..37 for LT_BLACK..LT_WHITE, 39 for default. */
+  if (fg >= LT_BLACK && fg <= LT_WHITE) {
+    p[pos++] = ';';
+    p[pos++] = '3';
+    p[pos++] = (char)('0' + (fg - LT_BLACK));
+  } else {
+    p[pos++] = ';';
+    p[pos++] = '3';
+    p[pos++] = '9';
+  }
+
+  /* bg: 40..47 for LT_BLACK..LT_WHITE, 49 for default. */
+  if (bg >= LT_BLACK && bg <= LT_WHITE) {
+    p[pos++] = ';';
+    p[pos++] = '4';
+    p[pos++] = (char)('0' + (bg - LT_BLACK));
+  } else {
+    p[pos++] = ';';
+    p[pos++] = '4';
+    p[pos++] = '9';
+  }
+
+  /* attr bits in stable order for test assertions. */
+  if (attrs & LT_BOLD) {
+    p[pos++] = ';';
+    p[pos++] = '1';
+  }
+  if (attrs & LT_DIM) {
+    p[pos++] = ';';
+    p[pos++] = '2';
+  }
+  if (attrs & LT_ITALIC) {
+    p[pos++] = ';';
+    p[pos++] = '3';
+  }
+  if (attrs & LT_UNDERLINE) {
+    p[pos++] = ';';
+    p[pos++] = '4';
+  }
+  if (attrs & LT_BLINK) {
+    p[pos++] = ';';
+    p[pos++] = '5';
+  }
+  if (attrs & LT_REVERSE) {
+    p[pos++] = ';';
+    p[pos++] = '7';
+  }
+  if (attrs & LT_STRIKE) {
+    p[pos++] = ';';
+    p[pos++] = '9';
+  }
+
+  p[pos++] = 'm';
+
+  lt__plat_commit(pos);
+  return LT_OK;
+}
+
 int lt__plat_render_run(const struct lt_cell *cells, int count) {
   if (count <= 0)
     return LT_OK;
+
+  lt_attr run_fg = cells[0].fg & 0x00FF;
+  lt_attr run_bg = cells[0].bg & 0x00FF;
+  lt_attr run_attrs = cells[0].fg & 0xFF00;
+
+  if (run_fg != lt__g.cur_fg || run_bg != lt__g.cur_bg ||
+      run_attrs != lt__g.cur_attrs) {
+    int sgr_rc = lt__plat_emit_sgr(run_fg, run_bg, run_attrs);
+    if (sgr_rc != LT_OK)
+      return sgr_rc;
+    lt__g.cur_fg = run_fg;
+    lt__g.cur_bg = run_bg;
+    lt__g.cur_attrs = run_attrs;
+  }
 
   size_t max = (size_t)count * 4;
   char *p = lt__plat_reserve(max);
