@@ -1,0 +1,86 @@
+/* Layer 8, chunk 1, step 3.
+ *
+ * Where to put this: src/platform/posix/plat_output.c,
+ * above lt__plat_render_run (currently at line 173).
+ *
+ * Worst-case bytes in LT_OUTPUT_NORMAL:
+ *   "\x1b[0;37;47;1;2;3;4;5;7;9m"  ~= 24 bytes
+ * Reserve 32 for headroom.
+ */
+
+static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
+  char *p = lt__plat_reserve(32);
+  if (!p)
+    return LT_ERR;
+
+  size_t pos = 0;
+  p[pos++] = '\x1b';
+  p[pos++] = '[';
+  p[pos++] = '0';
+
+  /* fg: 30..37 for LT_BLACK..LT_WHITE, 39 for default. */
+  if (fg >= LT_BLACK && fg <= LT_WHITE) {
+    p[pos++] = ';';
+    p[pos++] = '3';
+    p[pos++] = (char)('0' + (fg - LT_BLACK));
+  } else {
+    p[pos++] = ';';
+    p[pos++] = '3';
+    p[pos++] = '9';
+  }
+
+  /* bg: 40..47 for LT_BLACK..LT_WHITE, 49 for default. */
+  if (bg >= LT_BLACK && bg <= LT_WHITE) {
+    p[pos++] = ';';
+    p[pos++] = '4';
+    p[pos++] = (char)('0' + (bg - LT_BLACK));
+  } else {
+    p[pos++] = ';';
+    p[pos++] = '4';
+    p[pos++] = '9';
+  }
+
+  /* attr bits in stable order for test assertions. */
+  if (attrs & LT_BOLD) {
+    p[pos++] = ';';
+    p[pos++] = '1';
+  }
+  if (attrs & LT_DIM) {
+    p[pos++] = ';';
+    p[pos++] = '2';
+  }
+  if (attrs & LT_ITALIC) {
+    p[pos++] = ';';
+    p[pos++] = '3';
+  }
+  if (attrs & LT_UNDERLINE) {
+    p[pos++] = ';';
+    p[pos++] = '4';
+  }
+  if (attrs & LT_BLINK) {
+    p[pos++] = ';';
+    p[pos++] = '5';
+  }
+  if (attrs & LT_REVERSE) {
+    p[pos++] = ';';
+    p[pos++] = '7';
+  }
+  if (attrs & LT_STRIKE) {
+    p[pos++] = ';';
+    p[pos++] = '9';
+  }
+
+  p[pos++] = 'm';
+
+  lt__plat_commit(pos);
+  return LT_OK;
+}
+
+/* After defining the function above, add this single line as the
+ * first statement inside lt__plat_render_run (right after the
+ * existing `if (count <= 0) return LT_OK;` guard). It silences any
+ * -Wunused-function warning while chunk 1 is in flight; chunk 2
+ * replaces it with the real call.
+ */
+
+(void)lt__plat_emit_sgr;

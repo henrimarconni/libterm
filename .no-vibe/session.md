@@ -51,8 +51,8 @@ Started: 2026-05-15
 - [x] 4. POSIX CSI modifier parsing added for `...~` and letter-final forms (`A/B/C/D/H/F`)
 - [x] 5. New parser test target added: `tests/test_posix_input_parse.c`
 - [x] 6. `ROADMAP.md` synced to current POSIX input status
-- [ ] 7. Broaden parser tests (negative cases + more modifier combinations)
-- [ ] 8. Decide next parity block (input-mode semantics vs color/SGR path)
+- [x] 7. Broaden parser tests (negative cases + more modifier combinations)
+- [x] 8. Decide next parity block (input-mode semantics vs color/SGR path) — picked SGR; wired LT_OUTPUT_NORMAL across render runs (visual verify pending user-run of examples/colors)
 
 ## Notes
 - `examples/keyboard.c` debug output is event-based by design (`key/ch/mod`), not direct character echo.
