@@ -1,4 +1,3 @@
-#include "common.h"
 #include "diff.h"
 
 int lt__simd_diff_first_differ_cell(const struct lt_cell *a,

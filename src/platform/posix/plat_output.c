@@ -217,18 +217,6 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   if (mode == LT_OUTPUT_CURRENT)
     mode = LT_OUTPUT_NORMAL;
 
-  switch (mode) {
-  case LT_OUTPUT_NORMAL:
-    break;
-  case LT_OUTPUT_256:
-  case LT_OUTPUT_216:
-  case LT_OUTPUT_GRAYSCALE:
-  case LT_OUTPUT_TRUECOLOR:
-  default:
-    /* temporary policy: fallback to NORMAL path below */
-    break;
-  }
-
   size_t pos = 0;
   p[pos++] = '\x1b';
   p[pos++] = '[';
@@ -288,8 +276,10 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
     }
   }
 
-  /* attrs: only emit changed/needed attrs */
-  const struct {
+  /* attrs: after a reset we re-apply every target attr; otherwise only the
+   * bits newly turned on. Both reduce to attrs_to_emit, so spans with no
+   * attribute work (the common case) skip the table walk entirely. */
+  static const struct {
     lt_attr bit;
     char code;
   } attr_map[] = {
@@ -297,22 +287,11 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
       {LT_BLINK, '5'}, {LT_REVERSE, '7'}, {LT_STRIKE, '9'},
   };
 
-  for (size_t i = 0; i < sizeof(attr_map) / sizeof(attr_map[0]); i++) {
-    bool target_on = (attrs & attr_map[i].bit) != 0;
-    bool cur_on = (lt__g.cur_attrs & attr_map[i].bit) != 0;
-
-    if (need_reset) {
-      if (target_on) {
-        if (wrote_any)
-          p[pos++] = ';';
-        p[pos++] = attr_map[i].code;
-        wrote_any = true;
-      }
-      continue;
-    }
-
-    /* no reset: only additions are needed */
-    if (target_on && !cur_on) {
+  lt_attr attrs_to_emit = need_reset ? attrs : (attrs & ~lt__g.cur_attrs);
+  if (attrs_to_emit) {
+    for (size_t i = 0; i < sizeof(attr_map) / sizeof(attr_map[0]); i++) {
+      if (!(attrs_to_emit & attr_map[i].bit))
+        continue;
       if (wrote_any)
         p[pos++] = ';';
       p[pos++] = attr_map[i].code;
