@@ -88,6 +88,51 @@ static void workload_box_redraw(int frame_index) {
   g_sink += (uint64_t)(frame_index & 1);
 }
 
+static void workload_sgr_rainbow(int frame_index) {
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
+  char ch = (char)('A' + (frame_index & 15));
+
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      /* Adjacent columns differ, so every cell starts a fresh SGR run.
+       * Shifting by frame_index animates the palette so the colors never
+       * match the previous present and emit_sgr fires every frame. */
+      lt_attr fg = (lt_attr)(LT_BLACK + ((x + y + frame_index) % 8));
+      lt_set_cell(x, y, ch, fg, LT_DEFAULT);
+    }
+  }
+
+  lt_present();
+  g_sink += (uint64_t)(frame_index & 1);
+}
+
+static void workload_sgr_attrs(int frame_index) {
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
+  char ch = (char)('A' + (frame_index & 15));
+
+  /* Each step both adds and drops attribute bits, driving emit_sgr down its
+   * reset-and-reapply path (cur_attrs carries bits the target lacks). */
+  static const lt_attr attr_cycle[] = {
+      0,
+      LT_BOLD,
+      LT_BOLD | LT_UNDERLINE,
+      LT_UNDERLINE,
+      LT_REVERSE,
+      LT_ITALIC | LT_DIM,
+  };
+  const int n = (int)(sizeof(attr_cycle) / sizeof(attr_cycle[0]));
+
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      lt_attr attrs = attr_cycle[(x + frame_index) % n];
+      lt_set_cell(x, y, ch, LT_WHITE | attrs, LT_DEFAULT);
+    }
+  }
+
+  lt_present();
+  g_sink += (uint64_t)(frame_index & 1);
+}
+
 static uint64_t now_ns(void) {
 #if defined(_WIN32)
   LARGE_INTEGER freq;
@@ -117,6 +162,8 @@ static const struct workload_case k_workloads[] = {
     {"sparse", workload_sparse},
     {"full", workload_full},
     {"box_redraw", workload_box_redraw},
+    {"sgr_rainbow", workload_sgr_rainbow},
+    {"sgr_attrs", workload_sgr_attrs},
 };
 
 #define k_workloads_count (sizeof(k_workloads) / sizeof(k_workloads[0]))
