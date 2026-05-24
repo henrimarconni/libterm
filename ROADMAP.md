@@ -28,7 +28,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_height` | `lt_height` | [x] | [x] | Reads cached `lt__g.height` |
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
 | `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | |
-| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX and Windows both have active cursor/render/flush sinks; SGR/color emission is still pending so output is currently glyph-focused |
+| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX now emits mode-aware SGR (normal/256/216/grayscale/truecolor); Windows render path remains glyph-focused |
 | `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
 | `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
 | `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
@@ -51,7 +51,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_set_output_mode` | `lt_set_output_mode` | [~] | [~] | Stores the flag; SGR emission is not yet driven by it (M3 work) |
+| `tb_set_output_mode` | `lt_set_output_mode` | [x] | [~] | POSIX SGR emission now branches on output mode; Windows still stores-only |
 
 ### Print / send helpers
 
@@ -69,9 +69,9 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_utf8_char_length` | `lt_utf8_char_length` | [~] | [~] | Implemented internally as `lt__utf8_char_length`; not exposed as public `lt_*` symbol yet |
-| `tb_utf8_char_to_unicode` | `lt_utf8_char_to_unicode` | [~] | [~] | Implemented internally as `lt__utf8_decode`; not exposed |
-| `tb_utf8_unicode_to_char` | `lt_utf8_unicode_to_char` | [~] | [~] | Implemented internally as `lt__utf8_encode`; not exposed |
+| `tb_utf8_char_length` | `lt_utf8_char_length` | [x] | [x] | Public wrapper exported over `lt__utf8_char_length` |
+| `tb_utf8_char_to_unicode` | `lt_utf8_char_to_unicode` | [x] | [x] | Public wrapper exported over strict decode path |
+| `tb_utf8_unicode_to_char` | `lt_utf8_unicode_to_char` | [x] | [x] | Public wrapper exported over `lt__utf8_encode` |
 
 ### Capability / introspection
 
@@ -151,11 +151,11 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
-Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`. **Not yet emitted as SGR** on either platform — `lt__plat_render_cell` writes the codepoint without color attributes.
+Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`. Emitted on POSIX via mode-aware SGR in `lt__plat_emit_sgr`; Windows still pending.
 
 ### Attributes (`TB_BOLD/UNDERLINE/…` → `LT_BOLD/UNDERLINE/…`)
 
-Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE`. Not emitted.
+Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE`. Emitted on POSIX SGR path; Windows still pending.
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
@@ -163,7 +163,7 @@ Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. 
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 
-Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. Stored but not consumed.
+Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. Consumed on POSIX SGR path; Windows stores-only.
 
 ### Function-hook ids (`TB_FUNC_*` → `LT_FUNC_*`)
 
@@ -207,8 +207,8 @@ A feature is listed here only if it has been observed working on a real terminal
 | Cursor-position cache (skip jump on natural advance) | [x] shared path | [x] shared path |
 | Alt-screen UX (prior scrollback preserved on exit) | [x] `\x1b[?1049h` / `\x1b[?1049l` | [x] `\x1b[?1049h` on init / `\x1b[?1049l` on shutdown |
 | Hand-rolled int-to-decimal in render path (no `snprintf`) | [x] | [x] `lt__plat_move_cursor` writes digits directly |
-| Bench harness (`examples/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
-| SGR / color emission | [ ] | [ ] |
+| Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
+| SGR / color emission | [x] | [ ] |
 | Mouse events | [ ] | [ ] |
 
 ---
@@ -217,11 +217,11 @@ A feature is listed here only if it has been observed working on a real terminal
 
 These are the things that, if fixed, would move the largest number of `[~]` rows above to `[x]`.
 
-1. **SGR/color emission is still missing on both platforms.** Renderers currently emit glyph bytes without fg/bg/attribute SGR state, so output modes and color constants are largely inert.
+1. **Windows SGR/color emission is still missing.** POSIX emits mode-aware SGR, but Windows renderer still emits glyph bytes without fg/bg/attribute SGR state.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
 3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
 4. **Public API surface still trails termbox2.** `lt_init_file/fd/rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared.
-5. **Public UTF-8 helper aliases are still missing.** Internal `lt__utf8_*` helpers exist, but public `lt_utf8_*` compatibility symbols are not exported.
+5. **Output-mode parity remains platform-skewed.** POSIX consumes normal/256/216/grayscale/truecolor in SGR emission; Windows still has stores-only output-mode behavior.
 
 ---
 

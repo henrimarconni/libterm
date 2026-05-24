@@ -170,70 +170,161 @@ int lt__plat_render_cell(int x, int y, const struct lt_cell *c) {
   return lt__plat_write(utf8, (size_t)ub);
 }
 
+static void lt__posix_emit_sep(char *p, size_t *pos, bool *wrote_any) {
+  if (*wrote_any)
+    p[(*pos)++] = ';';
+  *wrote_any = true;
+}
+
+static void lt__posix_emit_sgr_256(char *p, size_t *pos, bool *wrote_any,
+                                   int is_fg, lt_attr v) {
+  int idx = (int)(v & 0xFF);
+  lt__posix_emit_sep(p, pos, wrote_any);
+  *pos += (size_t)lt__posix_write_uint(p + *pos, is_fg ? 38 : 48);
+  p[(*pos)++] = ';';
+  p[(*pos)++] = '5';
+  p[(*pos)++] = ';';
+  *pos += (size_t)lt__posix_write_uint(p + *pos, idx);
+}
+
+static void lt__posix_emit_sgr_truecolor(char *p, size_t *pos, bool *wrote_any,
+                                         int is_fg, lt_attr v) {
+  int r = (int)((v >> 16) & 0xFF);
+  int g = (int)((v >> 8) & 0xFF);
+  int b = (int)(v & 0xFF);
+
+  lt__posix_emit_sep(p, pos, wrote_any);
+  *pos += (size_t)lt__posix_write_uint(p + *pos, is_fg ? 38 : 48);
+  p[(*pos)++] = ';';
+  p[(*pos)++] = '2';
+  p[(*pos)++] = ';';
+  *pos += (size_t)lt__posix_write_uint(p + *pos, r);
+  p[(*pos)++] = ';';
+  *pos += (size_t)lt__posix_write_uint(p + *pos, g);
+  p[(*pos)++] = ';';
+  *pos += (size_t)lt__posix_write_uint(p + *pos, b);
+}
+
 static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
+  if (fg == lt__g.cur_fg && bg == lt__g.cur_bg && attrs == lt__g.cur_attrs)
+    return LT_OK;
+
   char *p = lt__plat_reserve(32);
   if (!p)
     return LT_ERR;
 
+  int mode = lt__g.output_mode;
+  if (mode == LT_OUTPUT_CURRENT)
+    mode = LT_OUTPUT_NORMAL;
+
+  switch (mode) {
+  case LT_OUTPUT_NORMAL:
+    break;
+  case LT_OUTPUT_256:
+  case LT_OUTPUT_216:
+  case LT_OUTPUT_GRAYSCALE:
+  case LT_OUTPUT_TRUECOLOR:
+  default:
+    /* temporary policy: fallback to NORMAL path below */
+    break;
+  }
+
   size_t pos = 0;
   p[pos++] = '\x1b';
   p[pos++] = '[';
-  p[pos++] = '0';
 
-  /* fg: 30..37 for LT_BLACK..LT_WHITE, 39 for default. */
-  if (fg >= LT_BLACK && fg <= LT_WHITE) {
-    p[pos++] = ';';
-    p[pos++] = '3';
-    p[pos++] = (char)('0' + (fg - LT_BLACK));
-  } else {
-    p[pos++] = ';';
-    p[pos++] = '3';
-    p[pos++] = '9';
-  }
+  bool need_reset = false;
 
-  /* bg: 40..47 for LT_BLACK..LT_WHITE, 49 for default. */
-  if (bg >= LT_BLACK && bg <= LT_WHITE) {
-    p[pos++] = ';';
-    p[pos++] = '4';
-    p[pos++] = (char)('0' + (bg - LT_BLACK));
-  } else {
-    p[pos++] = ';';
-    p[pos++] = '4';
-    p[pos++] = '9';
+  /* If any attr bit was present and now removed, delta codes are messy;
+   * reset then re-apply target style for correctness. */
+  if ((lt__g.cur_attrs & ~attrs) != 0)
+    need_reset = true;
+
+  bool wrote_any = false;
+  if (need_reset) {
+    p[pos++] = '0';
+    wrote_any = true;
   }
 
-  /* attr bits in stable order for test assertions. */
-  if (attrs & LT_BOLD) {
-    p[pos++] = ';';
-    p[pos++] = '1';
+  /* fg */
+  if (need_reset || fg != lt__g.cur_fg) {
+    if (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+        mode == LT_OUTPUT_GRAYSCALE) {
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 1, fg);
+    } else if (mode == LT_OUTPUT_TRUECOLOR) {
+      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 1, fg);
+    } else {
+      lt__posix_emit_sep(p, &pos, &wrote_any);
+      if (fg >= LT_BLACK && fg <= LT_WHITE) {
+        p[pos++] = '3';
+        p[pos++] = (char)('0' + (fg - LT_BLACK));
+      } else {
+        p[pos++] = '3';
+        p[pos++] = '9';
+      }
+    }
   }
-  if (attrs & LT_DIM) {
-    p[pos++] = ';';
-    p[pos++] = '2';
+
+  /* bg */
+  bool skip_bg_256_default = !need_reset && bg == LT_DEFAULT &&
+                             bg == lt__g.cur_bg &&
+                             (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+                              mode == LT_OUTPUT_GRAYSCALE);
+  if (!skip_bg_256_default && (need_reset || bg != lt__g.cur_bg)) {
+    if (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+        mode == LT_OUTPUT_GRAYSCALE) {
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 0, bg);
+    } else if (mode == LT_OUTPUT_TRUECOLOR) {
+      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 0, bg);
+    } else {
+      lt__posix_emit_sep(p, &pos, &wrote_any);
+      if (bg >= LT_BLACK && bg <= LT_WHITE) {
+        p[pos++] = '4';
+        p[pos++] = (char)('0' + (bg - LT_BLACK));
+      } else {
+        p[pos++] = '4';
+        p[pos++] = '9';
+      }
+    }
   }
-  if (attrs & LT_ITALIC) {
-    p[pos++] = ';';
-    p[pos++] = '3';
+
+  /* attrs: only emit changed/needed attrs */
+  const struct {
+    lt_attr bit;
+    char code;
+  } attr_map[] = {
+      {LT_BOLD, '1'},  {LT_DIM, '2'},     {LT_ITALIC, '3'}, {LT_UNDERLINE, '4'},
+      {LT_BLINK, '5'}, {LT_REVERSE, '7'}, {LT_STRIKE, '9'},
+  };
+
+  for (size_t i = 0; i < sizeof(attr_map) / sizeof(attr_map[0]); i++) {
+    bool target_on = (attrs & attr_map[i].bit) != 0;
+    bool cur_on = (lt__g.cur_attrs & attr_map[i].bit) != 0;
+
+    if (need_reset) {
+      if (target_on) {
+        if (wrote_any)
+          p[pos++] = ';';
+        p[pos++] = attr_map[i].code;
+        wrote_any = true;
+      }
+      continue;
+    }
+
+    /* no reset: only additions are needed */
+    if (target_on && !cur_on) {
+      if (wrote_any)
+        p[pos++] = ';';
+      p[pos++] = attr_map[i].code;
+      wrote_any = true;
+    }
   }
-  if (attrs & LT_UNDERLINE) {
-    p[pos++] = ';';
-    p[pos++] = '4';
-  }
-  if (attrs & LT_BLINK) {
-    p[pos++] = ';';
-    p[pos++] = '5';
-  }
-  if (attrs & LT_REVERSE) {
-    p[pos++] = ';';
-    p[pos++] = '7';
-  }
-  if (attrs & LT_STRIKE) {
-    p[pos++] = ';';
-    p[pos++] = '9';
-  }
+
+  /* Safety: if somehow nothing got written, avoid emitting malformed ESC[ m. */
+  if (!wrote_any)
+    return LT_OK;
 
   p[pos++] = 'm';
-
   lt__plat_commit(pos);
   return LT_OK;
 }
@@ -242,53 +333,78 @@ int lt__plat_render_run(const struct lt_cell *cells, int count) {
   if (count <= 0)
     return LT_OK;
 
-  lt_attr run_fg = cells[0].fg & 0x00FF;
-  lt_attr run_bg = cells[0].bg & 0x00FF;
-  lt_attr run_attrs = cells[0].fg & 0xFF00;
+  lt_attr span_fg = 0;
+  lt_attr span_bg = 0;
+  lt_attr span_attrs = 0;
 
-  if (run_fg != lt__g.cur_fg || run_bg != lt__g.cur_bg ||
-      run_attrs != lt__g.cur_attrs) {
-    int sgr_rc = lt__plat_emit_sgr(run_fg, run_bg, run_attrs);
-    if (sgr_rc != LT_OK)
-      return sgr_rc;
-    lt__g.cur_fg = run_fg;
-    lt__g.cur_bg = run_bg;
-    lt__g.cur_attrs = run_attrs;
-  }
+  int sgr_rc = 0, span_len = 0, rc = 0, ub = 0;
+  size_t max = 0, pos = 0;
+  char *p = NULL;
 
-  size_t max = (size_t)count * 4;
-  char *p = lt__plat_reserve(max);
-  if (!p) {
-    int rc = 0;
-    for (int i = 0; i < count; i++) {
-      rc = lt__plat_render_cell(0, 0, &cells[i]);
-      if (rc != LT_OK)
-        return rc;
-    }
-    return LT_OK;
-  }
-
-  size_t pos = 0;
-  int ub = 0;
   lt_uchar ch = (lt_uchar)' ';
-  for (int i = 0; i < count; i++) {
-    ch = cells[i].ch ? cells[i].ch : (lt_uchar)' ';
-    if (ch < 0x80) {
-      p[pos++] = (char)ch;
+
+  int i = 0, j = 0;
+  while (i < count) {
+    span_fg = cells[i].fg & 0x00FF;
+    span_bg = cells[i].bg & 0x00FF;
+    span_attrs = cells[i].fg & 0xFF00;
+
+    if (span_fg != lt__g.cur_fg || span_bg != lt__g.cur_bg ||
+        span_attrs != lt__g.cur_attrs) {
+      sgr_rc = lt__plat_emit_sgr(span_fg, span_bg, span_attrs);
+      if (sgr_rc != LT_OK)
+        return sgr_rc;
+
+      lt__g.cur_fg = span_fg;
+      lt__g.cur_bg = span_bg;
+      lt__g.cur_attrs = span_attrs;
+    }
+
+    j = i + 1;
+    while (j < count) {
+      if ((cells[j].fg & 0x00FF) != span_fg ||
+          (cells[j].bg & 0x00FF) != span_bg ||
+          (cells[j].fg & 0xFF00) != span_attrs)
+        break;
+      j++;
+    }
+
+    span_len = j - i;
+    max = (size_t)span_len * 4;
+    p = lt__plat_reserve(max);
+    if (!p) {
+      for (int k = i; k < j; k++) {
+        rc = lt__plat_render_cell(0, 0, &cells[k]);
+        if (rc != LT_OK)
+          return rc;
+      }
+      i = j;
       continue;
     }
 
-    char tmp[4];
-    ub = lt__utf8_encode(ch, tmp);
-    if (ub <= 0) {
-      p[pos++] = ' ';
-      continue;
+    pos = 0;
+    for (int k = i; k < j; k++) {
+      ch = cells[k].ch ? cells[k].ch : (lt_uchar)' ';
+
+      if (ch < 0x80) {
+        p[pos++] = (char)ch;
+        continue;
+      }
+
+      char tmp[4];
+      ub = lt__utf8_encode(ch, tmp);
+      if (ub <= 0) {
+        p[pos++] = ' ';
+        continue;
+      }
+
+      for (int t = 0; t < ub; t++)
+        p[pos++] = tmp[t];
     }
 
-    for (int j = 0; j < ub; j++)
-      p[pos++] = tmp[j];
+    lt__plat_commit(pos);
+    i = j;
   }
 
-  lt__plat_commit(pos);
   return LT_OK;
 }
