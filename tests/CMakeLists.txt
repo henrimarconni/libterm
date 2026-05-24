@@ -13,4 +13,12 @@ endfunction()
 libterm_add_test(test_utf8)
 libterm_add_test(test_buffer)
 libterm_add_test(test_api)
-libterm_add_test(test_posix_input_parse)
+if(NOT WIN32)
+    libterm_add_test(test_posix_input_parse)
+    add_executable(test_posix_input_sgr_run_split test_posix_input_sgr_run_split.c)
+    target_include_directories(test_posix_input_sgr_run_split PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    add_test(NAME test_posix_input_sgr_run_split COMMAND test_posix_input_sgr_run_split)
+endif()
