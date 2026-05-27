@@ -38,3 +38,13 @@ if(DEFINED LIBTERM_SIMD_RESOLVED)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
                 ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
 endif()
+
+# Assert the shared library actually exports its public API (guards B2: the
+# visibility regression where LT_API was empty under -fvisibility=hidden).
+if(NOT WIN32 AND TARGET libterm_shared)
+    add_test(
+        NAME test_exports
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_exports.sh
+                ${CMAKE_SOURCE_DIR}/include/libterm/libterm.h
+                $<TARGET_FILE:libterm_shared>)
+endif()

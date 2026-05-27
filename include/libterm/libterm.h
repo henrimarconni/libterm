@@ -20,6 +20,8 @@ extern "C" {
 #else
 #define LT_API __declspec(dllimport)
 #endif
+#elif defined(LIBTERM_SHARED) && (defined(__GNUC__) || defined(__clang__))
+#define LT_API __attribute__((visibility("default")))
 #else
 #define LT_API
 #endif
