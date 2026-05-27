@@ -22,6 +22,11 @@ if(NOT WIN32)
         ${CMAKE_SOURCE_DIR}/include
     )
     add_test(NAME test_posix_input_sgr_run_split COMMAND test_posix_input_sgr_run_split)
+    add_executable(test_pty_lifecycle test_pty_lifecycle.c)
+    target_link_libraries(test_pty_lifecycle PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_pty_lifecycle PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_pty_lifecycle COMMAND test_pty_lifecycle)
+    set_tests_properties(test_pty_lifecycle PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
