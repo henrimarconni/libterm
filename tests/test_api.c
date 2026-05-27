@@ -33,8 +33,17 @@ static void test_strerror(void) {
   assert(lt_strerror(123)[0] != '\0');
 }
 
+static void test_not_init(void) {
+  /* width/height read as 0 before init (no error code; they return state) */
+  assert(lt_width() == 0);
+  assert(lt_height() == 0);
+  /* set_clear_attrs must reject when not initialized, like its siblings */
+  assert(lt_set_clear_attrs(LT_GREEN, LT_BLACK) == LT_ERR_NOT_INIT);
+}
+
 int main(void) {
   test_strerror();
+  test_not_init();
 
   struct lt_event ev;
 

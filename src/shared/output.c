@@ -27,6 +27,8 @@ int lt_clear(void) {
 }
 
 int lt_set_clear_attrs(lt_attr fg, lt_attr bg) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
   lt__g.clear_fg = fg;
   lt__g.clear_bg = bg;
   return LT_OK;
