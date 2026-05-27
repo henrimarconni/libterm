@@ -32,12 +32,16 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
   const char *pb = (const char *)(const void *)b;
   size_t n = (size_t)count * sizeof(struct lt_cell);
   size_t i = 0;
+  uint8x16_t va = vdupq_n_u8(0);
+  uint8x16_t vb = vdupq_n_u8(0);
+  uint8x16_t eq = vdupq_n_u8(0);
+  uint64_t mask = 0;
 
   for (; i + 16 <= n; i += 16) {
-    uint8x16_t va = vld1q_u8((const uint8_t *)(pa + i));
-    uint8x16_t vb = vld1q_u8((const uint8_t *)(pb + i));
-    uint8x16_t eq = vceqq_u8(va, vb);
-    uint64_t mask = lt__neon_movemask(eq);
+    va = vld1q_u8((const uint8_t *)(pa + i));
+    vb = vld1q_u8((const uint8_t *)(pb + i));
+    eq = vceqq_u8(va, vb);
+    mask = lt__neon_movemask(eq);
     if (mask != 0xFFFFFFFFFFFFFFFFull) {
       /* each byte became a 4-bit nibble; first differing byte at lane = ctz / 4 */
       uint64_t diff = ~mask;
@@ -55,22 +59,44 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
   return count;
 }
 
+/* NEON first-equal: a 128-bit vector is exactly one 16-byte cell. The cell is
+ * equal iff all 16 byte-compares are true, i.e. the nibble movemask is all-ones.
+ * Relies on the _reserved==0 invariant so byte-equality == field-equality. */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
+  if (count <= 0)
+    return count;
+
+  const char *pa = (const char *)(const void *)a;
+  const char *pb = (const char *)(const void *)b;
+  uint8x16_t va = vdupq_n_u8(0);
+  uint8x16_t vb = vdupq_n_u8(0);
+  uint8x16_t eq = vdupq_n_u8(0);
+  uint64_t mask = 0;
+
   for (int i = 0; i < count; i++) {
-    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg)
+    const size_t off = (size_t)i * sizeof(struct lt_cell);
+    va = vld1q_u8((const uint8_t *)(pa + off));
+    vb = vld1q_u8((const uint8_t *)(pb + off));
+    eq = vceqq_u8(va, vb);
+    mask = lt__neon_movemask(eq);
+    if (mask == 0xFFFFFFFFFFFFFFFFull)
       return i;
   }
   return count;
 }
 
-/* Scalar fallback for now; NEON broadcast-and-store left as a follow-up. */
+/* NEON fill: load the 16-byte cell template once, store it per cell
+ * (each cell is one 128-bit vst1q). */
 void lt__simd_fill_cells(struct lt_cell *buf, int count, lt_attr fg,
                          lt_attr bg) {
-  for (int i = 0; i < count; i++) {
-    buf[i].ch = ' ';
-    buf[i].fg = fg;
-    buf[i].bg = bg;
-    buf[i]._reserved = 0;
-  }
+  if (count <= 0)
+    return;
+
+  struct lt_cell tmpl = {.ch = ' ', .fg = fg, .bg = bg, ._reserved = 0};
+  uint8x16_t v = vld1q_u8((const uint8_t *)&tmpl);
+
+  char *p = (char *)buf;
+  for (int i = 0; i < count; i++)
+    vst1q_u8((uint8_t *)(p + (size_t)i * sizeof(struct lt_cell)), v);
 }
