@@ -76,6 +76,10 @@ endif()
 set(LIBTERM_SIMD_TU "intrinsics/${LIBTERM_SIMD_RESOLVED}.c")
 message(STATUS "libterm SIMD: ${LIBTERM_SIMD_RESOLVED} (flags: ${LIBTERM_SIMD_FLAGS})")
 
+# Expose the resolved backend to sibling subdirectories (tests/ uses it to
+# assert the selected backend actually emitted SIMD instructions).
+set(LIBTERM_SIMD_RESOLVED "${LIBTERM_SIMD_RESOLVED}" PARENT_SCOPE)
+
 set(LIBTERM_ALL_SOURCES
     ${LIBTERM_SHARED_SOURCES}
     ${LIBTERM_PLATFORM_SOURCES}

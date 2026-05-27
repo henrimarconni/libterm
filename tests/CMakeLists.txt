@@ -23,3 +23,13 @@ if(NOT WIN32)
     )
     add_test(NAME test_posix_input_sgr_run_split COMMAND test_posix_input_sgr_run_split)
 endif()
+
+# Assert the selected SIMD backend actually emitted its ISA instructions, so a
+# silent scalar fallback cannot pass the correctness contract test. Runs on the
+# host (bash + objdump on the per-backend object); not under the cross emulator.
+if(DEFINED LIBTERM_SIMD_RESOLVED)
+    add_test(
+        NAME test_simd_emitted
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
+                ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
+endif()
