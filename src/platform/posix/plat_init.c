@@ -40,12 +40,11 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   lt__posix_tty_fd = ttyfd;
   lt__posix_tty_fd_owned = owned;
 
-  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0) {
-    if (owned)
-      close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    return LT_ERR_INIT_OPEN;
-  }
+  int rc = LT_ERR_INIT_OPEN;
+
+  /* orig_tios not captured yet -> nothing to restore (goto fail, not fail_restore) */
+  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0)
+    goto fail;
 
   lt__posix_has_orig_tios = 1;
 
@@ -53,44 +52,35 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   cfmakeraw(&raw);
   raw.c_cc[VMIN] = 1;
   raw.c_cc[VTIME] = 0;
-  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0) {
-    if (owned)
-      close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return LT_ERR_INIT_OPEN;
-  }
+  /* raw mode failed to apply -> terminal still in orig mode, do not restore */
+  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0)
+    goto fail;
 
-  int rrc = lt__posix_resize_init();
-  if (rrc != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    if (owned)
-      close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return rrc;
-  }
+  rc = lt__posix_resize_init();
+  if (rc != LT_OK)
+    goto fail_restore;
 
   static const char enter_alt[] = "\x1b[?1049h";
   if (lt__plat_write(enter_alt, sizeof(enter_alt) - 1) != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    if (owned)
-      close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return LT_ERR_INIT_OPEN;
+    rc = LT_ERR_INIT_OPEN;
+    goto fail_restore;
   }
 
   if (lt__plat_flush() != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    if (owned)
-      close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return LT_ERR_INIT_OPEN;
+    rc = LT_ERR_INIT_OPEN;
+    goto fail_restore;
   }
 
   return LT_OK;
+
+fail_restore:
+  (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+fail:
+  if (owned)
+    close(lt__posix_tty_fd);
+  lt__posix_tty_fd = -1;
+  lt__posix_has_orig_tios = 0;
+  return rc;
 }
 
 int lt__plat_init(void) {
