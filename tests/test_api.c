@@ -41,6 +41,28 @@ static void test_not_init(void) {
   assert(lt_set_clear_attrs(LT_GREEN, LT_BLACK) == LT_ERR_NOT_INIT);
 }
 
+static void test_modes(void) {
+  /* input modes: setting returns the new mode; CURRENT reads it back */
+  const int in_modes[] = {LT_INPUT_ESC, LT_INPUT_ALT, LT_INPUT_MOUSE};
+  for (int i = 0; i < (int)(sizeof in_modes / sizeof in_modes[0]); i++) {
+    assert(lt_set_input_mode(in_modes[i]) == in_modes[i]);
+    assert(lt_set_input_mode(LT_INPUT_CURRENT) == in_modes[i]);
+  }
+  /* output modes: same contract across every documented value */
+  const int out_modes[] = {LT_OUTPUT_NORMAL, LT_OUTPUT_256, LT_OUTPUT_216,
+                           LT_OUTPUT_GRAYSCALE, LT_OUTPUT_TRUECOLOR};
+  for (int i = 0; i < (int)(sizeof out_modes / sizeof out_modes[0]); i++) {
+    assert(lt_set_output_mode(out_modes[i]) == out_modes[i]);
+    assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == out_modes[i]);
+  }
+  /* setters are permissive: an out-of-range value is stored and returned as-is
+   * (pinned behavior — there is no validation in the current API) */
+  assert(lt_set_input_mode(999) == 999);
+  assert(lt_set_input_mode(LT_INPUT_CURRENT) == 999);
+  assert(lt_set_output_mode(999) == 999);
+  assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == 999);
+}
+
 int main(void) {
   test_strerror();
   test_not_init();
@@ -71,6 +93,8 @@ int main(void) {
   assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == 0);
   assert(lt_set_output_mode(LT_OUTPUT_256) == LT_OUTPUT_256);
   assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == LT_OUTPUT_256);
+
+  test_modes();
 
   /* lifecycle happy path (may be unavailable in non-tty runners) */
   int irc = lt_init();
