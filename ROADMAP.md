@@ -16,7 +16,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 |---|---|---|---|---|
 | `tb_init` | `lt_init` | [x] | [x] | POSIX now opens `/dev/tty`, enters raw mode, enters alt-screen, and initializes SIGWINCH self-pipe. Windows enters raw mode + alt-screen (`\x1b[?1049h`) so prior scrollback is preserved across the libterm session |
 | `tb_init_file` | `lt_init_file` | [ ] | [ ] | Not declared in `libterm.h` |
-| `tb_init_fd` | `lt_init_fd` | [ ] | [—] | Not declared |
+| `tb_init_fd` | `lt_init_fd` | [x] | [—] | Inits against a caller-supplied tty fd (`isatty`-validated; **not** closed on shutdown — caller retains ownership). Mirrors termbox2's `tb_init_fd`; `lt_init` now delegates to it via shared `lt__finish_init`. Windows: stub returns `LT_ERR_INIT_OPEN` (POSIX-only). Exercised headlessly by `tests/test_pty_lifecycle.c` |
 | `tb_init_rwfd` | `lt_init_rwfd` | [ ] | [—] | Not declared |
 | `tb_shutdown` | `lt_shutdown` | [x] | [x] | POSIX restores cursor visibility, leaves alt-screen, restores saved termios, tears down resize pipe/signal state, and closes tty fd. Windows leaves alt-screen (`\x1b[?1049l`) after cursor-show + flush, then restores both console modes |
 
@@ -27,7 +27,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_width` | `lt_width` | [x] | [x] | Reads cached `lt__g.width` |
 | `tb_height` | `lt_height` | [x] | [x] | Reads cached `lt__g.height` |
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
-| `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | |
+| `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | Returns `LT_ERR_NOT_INIT` before `lt_init` (consistent with `lt_clear`/`lt_present`/`lt_set_cell`) |
 | `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX now emits mode-aware SGR (normal/256/216/grayscale/truecolor); Windows render path remains glyph-focused |
 | `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
 | `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
@@ -78,7 +78,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
 | `tb_last_errno` | `lt_last_errno` | [ ] | [ ] | |
-| `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for currently used error codes |
+| `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for **all 23** return codes (distinct messages + `"unknown error"` fallback); exhaustiveness + distinctness asserted in `tests/test_api.c` |
 | `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | |
 | `tb_has_egc` | `lt_has_egc` | [ ] | [ ] | |
 | `tb_attr_width` | `lt_attr_width` | [ ] | [ ] | |
@@ -192,7 +192,7 @@ A feature is listed here only if it has been observed working on a real terminal
 
 | Capability | POSIX | Windows |
 |---|---|---|
-| `lt_init` / `lt_shutdown` round-trip without leaking handles | [x] raw mode + alt-screen + SIGWINCH self-pipe lifecycle | [x] saves and restores both console modes |
+| `lt_init` / `lt_shutdown` round-trip without leaking handles | [x] raw mode + alt-screen + SIGWINCH self-pipe lifecycle; auto-tested headlessly via `lt_init_fd` + `openpty` (`tests/test_pty_lifecycle.c`) | [x] saves and restores both console modes |
 | Console size queried from kernel (not env) | [x] `ioctl(TIOCGWINSZ)` | [x] `csbi.srWindow`-based viewport size |
 | `lt_clear` zeroes the back buffer | [x] | [x] |
 | `lt_set_cell` writes a codepoint into the back buffer | [x] | [x] |
@@ -220,7 +220,7 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 1. **Windows SGR/color emission is still missing.** POSIX emits mode-aware SGR, but Windows renderer still emits glyph bytes without fg/bg/attribute SGR state.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
 3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
-4. **Public API surface still trails termbox2.** `lt_init_file/fd/rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared.
+4. **Public API surface still trails termbox2.** `lt_init_file` / `lt_init_rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared. (`lt_init_fd` is now declared and implemented on POSIX.)
 5. **Output-mode parity remains platform-skewed.** POSIX consumes normal/256/216/grayscale/truecolor in SGR emission; Windows still has stores-only output-mode behavior.
 
 ---
