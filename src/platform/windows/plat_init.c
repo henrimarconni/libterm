@@ -77,6 +77,12 @@ int lt__plat_init(void) {
   return LT_OK;
 }
 
+int lt__plat_init_fd(int ttyfd, int owned) {
+  (void)ttyfd;
+  (void)owned;
+  return LT_ERR_INIT_OPEN; /* fd-based init is POSIX-only */
+}
+
 int lt__plat_shutdown(void) {
 #if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
   return LT_OK;

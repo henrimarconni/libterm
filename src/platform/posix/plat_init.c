@@ -20,8 +20,68 @@
 static int lt__posix_tty_fd = -1;
 static struct termios lt__posix_orig_tios;
 static int lt__posix_has_orig_tios = 0;
+static int lt__posix_tty_fd_owned = 0;
 
 int lt__posix_get_tty_fd(void) { return lt__posix_tty_fd; }
+
+int lt__plat_init_fd(int ttyfd, int owned) {
+#if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  (void)ttyfd;
+  (void)owned;
+  return LT_OK;
+#endif
+
+  if (lt__posix_tty_fd >= 0)
+    return LT_ERR_INIT_ALREADY;
+
+  if (ttyfd < 0 || !isatty(ttyfd))
+    return LT_ERR_INIT_OPEN;
+
+  lt__posix_tty_fd = ttyfd;
+  lt__posix_tty_fd_owned = owned;
+
+  int rc = LT_ERR_INIT_OPEN;
+
+  /* orig_tios not captured yet -> nothing to restore (goto fail, not fail_restore) */
+  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0)
+    goto fail;
+
+  lt__posix_has_orig_tios = 1;
+
+  struct termios raw = lt__posix_orig_tios;
+  cfmakeraw(&raw);
+  raw.c_cc[VMIN] = 1;
+  raw.c_cc[VTIME] = 0;
+  /* raw mode failed to apply -> terminal still in orig mode, do not restore */
+  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0)
+    goto fail;
+
+  rc = lt__posix_resize_init();
+  if (rc != LT_OK)
+    goto fail_restore;
+
+  static const char enter_alt[] = "\x1b[?1049h";
+  if (lt__plat_write(enter_alt, sizeof(enter_alt) - 1) != LT_OK) {
+    rc = LT_ERR_INIT_OPEN;
+    goto fail_restore;
+  }
+
+  if (lt__plat_flush() != LT_OK) {
+    rc = LT_ERR_INIT_OPEN;
+    goto fail_restore;
+  }
+
+  return LT_OK;
+
+fail_restore:
+  (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
+fail:
+  if (owned)
+    close(lt__posix_tty_fd);
+  lt__posix_tty_fd = -1;
+  lt__posix_has_orig_tios = 0;
+  return rc;
+}
 
 int lt__plat_init(void) {
 #if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
@@ -31,55 +91,11 @@ int lt__plat_init(void) {
   if (lt__posix_tty_fd >= 0)
     return LT_ERR_INIT_ALREADY;
 
-  lt__posix_tty_fd = open("/dev/tty", O_RDWR);
-  if (lt__posix_tty_fd < 0)
+  int fd = open("/dev/tty", O_RDWR);
+  if (fd < 0)
     return LT_ERR_INIT_OPEN;
 
-  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0) {
-    close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    return LT_ERR_INIT_OPEN;
-  }
-
-  lt__posix_has_orig_tios = 1;
-
-  struct termios raw = lt__posix_orig_tios;
-  cfmakeraw(&raw);
-  raw.c_cc[VMIN] = 1;
-  raw.c_cc[VTIME] = 0;
-  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0) {
-    close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    return LT_ERR_INIT_OPEN;
-  }
-
-  int rrc = lt__posix_resize_init();
-  if (rrc != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return rrc;
-  }
-
-  static const char enter_alt[] = "\x1b[?1049h";
-  if (lt__plat_write(enter_alt, sizeof(enter_alt) - 1) != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return LT_ERR_INIT_OPEN;
-  }
-
-  if (lt__plat_flush() != LT_OK) {
-    (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
-    close(lt__posix_tty_fd);
-    lt__posix_tty_fd = -1;
-    lt__posix_has_orig_tios = 0;
-    return LT_ERR_INIT_OPEN;
-  }
-
-  return LT_OK;
+  return lt__plat_init_fd(fd, 1);
 }
 
 int lt__plat_shutdown(void) {
@@ -98,10 +114,12 @@ int lt__plat_shutdown(void) {
       (void)tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &lt__posix_orig_tios);
     }
 
-    close(lt__posix_tty_fd);
+    if (lt__posix_tty_fd_owned)
+      close(lt__posix_tty_fd);
   }
 
   lt__posix_tty_fd = -1;
+  lt__posix_tty_fd_owned = 0;
   lt__posix_has_orig_tios = 0;
   return LT_OK;
 }

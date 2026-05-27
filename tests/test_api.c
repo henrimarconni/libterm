@@ -2,7 +2,71 @@
 #include <assert.h>
 #include <string.h>
 
+static void test_strerror(void) {
+  /* every code returns a non-NULL, non-empty string */
+  const int codes[] = {
+      LT_OK,                    LT_ERR,
+      LT_ERR_NEED_MORE,         LT_ERR_INIT_ALREADY,
+      LT_ERR_INIT_OPEN,         LT_ERR_MEM,
+      LT_ERR_NO_EVENT,          LT_ERR_NO_TERM,
+      LT_ERR_NOT_INIT,          LT_ERR_OUT_OF_BOUNDS,
+      LT_ERR_READ,              LT_ERR_RESIZE_IOCTL,
+      LT_ERR_RESIZE_PIPE,       LT_ERR_RESIZE_SIGACTION,
+      LT_ERR_POLL,              LT_ERR_TCGETATTR,
+      LT_ERR_TCSETATTR,         LT_ERR_UNSUPPORTED_TERM,
+      LT_ERR_RESIZE_WRITE,      LT_ERR_RESIZE_POLL,
+      LT_ERR_RESIZE_READ,       LT_ERR_RESIZE_SSCANF,
+      LT_ERR_CAP_COLLISION,
+  };
+  const int n = (int)(sizeof codes / sizeof codes[0]);
+  for (int i = 0; i < n; i++) {
+    const char *s = lt_strerror(codes[i]);
+    assert(s != NULL);
+    assert(s[0] != '\0');
+  }
+  /* known codes map to mutually distinct strings */
+  for (int i = 0; i < n; i++)
+    for (int j = i + 1; j < n; j++)
+      assert(strcmp(lt_strerror(codes[i]), lt_strerror(codes[j])) != 0);
+  /* an unknown code returns a non-NULL fallback */
+  assert(lt_strerror(123) != NULL);
+  assert(lt_strerror(123)[0] != '\0');
+}
+
+static void test_not_init(void) {
+  /* width/height read as 0 before init (no error code; they return state) */
+  assert(lt_width() == 0);
+  assert(lt_height() == 0);
+  /* set_clear_attrs must reject when not initialized, like its siblings */
+  assert(lt_set_clear_attrs(LT_GREEN, LT_BLACK) == LT_ERR_NOT_INIT);
+}
+
+static void test_modes(void) {
+  /* input modes: setting returns the new mode; CURRENT reads it back */
+  const int in_modes[] = {LT_INPUT_ESC, LT_INPUT_ALT, LT_INPUT_MOUSE};
+  for (int i = 0; i < (int)(sizeof in_modes / sizeof in_modes[0]); i++) {
+    assert(lt_set_input_mode(in_modes[i]) == in_modes[i]);
+    assert(lt_set_input_mode(LT_INPUT_CURRENT) == in_modes[i]);
+  }
+  /* output modes: same contract across every documented value */
+  const int out_modes[] = {LT_OUTPUT_NORMAL, LT_OUTPUT_256, LT_OUTPUT_216,
+                           LT_OUTPUT_GRAYSCALE, LT_OUTPUT_TRUECOLOR};
+  for (int i = 0; i < (int)(sizeof out_modes / sizeof out_modes[0]); i++) {
+    assert(lt_set_output_mode(out_modes[i]) == out_modes[i]);
+    assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == out_modes[i]);
+  }
+  /* setters are permissive: an out-of-range value is stored and returned as-is
+   * (pinned behavior — there is no validation in the current API) */
+  assert(lt_set_input_mode(999) == 999);
+  assert(lt_set_input_mode(LT_INPUT_CURRENT) == 999);
+  assert(lt_set_output_mode(999) == 999);
+  assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == 999);
+}
+
 int main(void) {
+  test_strerror();
+  test_not_init();
+
   struct lt_event ev;
 
   /* stable metadata */
@@ -29,6 +93,8 @@ int main(void) {
   assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == 0);
   assert(lt_set_output_mode(LT_OUTPUT_256) == LT_OUTPUT_256);
   assert(lt_set_output_mode(LT_OUTPUT_CURRENT) == LT_OUTPUT_256);
+
+  test_modes();
 
   /* lifecycle happy path (may be unavailable in non-tty runners) */
   int irc = lt_init();

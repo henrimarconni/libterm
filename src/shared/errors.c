@@ -26,6 +26,28 @@ const char *lt_strerror(int code) {
     return "read error";
   case LT_ERR_UNSUPPORTED_TERM:
     return "unsupported terminal";
+  case LT_ERR_RESIZE_IOCTL:
+    return "resize: ioctl failed";
+  case LT_ERR_RESIZE_PIPE:
+    return "resize: pipe failed";
+  case LT_ERR_RESIZE_SIGACTION:
+    return "resize: sigaction failed";
+  case LT_ERR_POLL:
+    return "poll failed";
+  case LT_ERR_TCGETATTR:
+    return "tcgetattr failed";
+  case LT_ERR_TCSETATTR:
+    return "tcsetattr failed";
+  case LT_ERR_RESIZE_WRITE:
+    return "resize: write failed";
+  case LT_ERR_RESIZE_POLL:
+    return "resize: poll failed";
+  case LT_ERR_RESIZE_READ:
+    return "resize: read failed";
+  case LT_ERR_RESIZE_SSCANF:
+    return "resize: sscanf failed";
+  case LT_ERR_CAP_COLLISION:
+    return "capability collision";
   default:
     return "unknown error";
   }
