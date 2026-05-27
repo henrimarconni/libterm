@@ -30,11 +30,14 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
   const char *pb = (const char *)b;
   size_t n = (size_t)count * sizeof(struct lt_cell);
   size_t i = 0;
+  __m256i va = _mm256_setzero_si256();
+  __m256i vb = _mm256_setzero_si256();
+  uint32_t eq = 0;
 
   for (; i + 32 <= n; i += 32) {
-    __m256i va = _mm256_loadu_si256((const __m256i *)(pa + i));
-    __m256i vb = _mm256_loadu_si256((const __m256i *)(pb + i));
-    uint32_t eq = (uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(va, vb));
+    va = _mm256_loadu_si256((const __m256i *)(pa + i));
+    vb = _mm256_loadu_si256((const __m256i *)(pb + i));
+    eq = (uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(va, vb));
     if (eq != 0xFFFFFFFF) {
       size_t byte_idx = i + (size_t)lt__ctz32(~eq);
       return (int)(byte_idx / sizeof(struct lt_cell));
@@ -60,11 +63,14 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
   const char *pa = (const char *)a;
   const char *pb = (const char *)b;
   int pairs = count / 2;
+  __m256i va = {0};
+  __m256i vb = {0};
+  uint32_t eq = 0;
 
   for (int p = 0; p < pairs; p++) {
-    __m256i va = _mm256_loadu_si256((const __m256i *)(pa + p * 32));
-    __m256i vb = _mm256_loadu_si256((const __m256i *)(pb + p * 32));
-    uint32_t eq = (uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(va, vb));
+    va = _mm256_loadu_si256((const __m256i *)(pa + p * 32));
+    vb = _mm256_loadu_si256((const __m256i *)(pb + p * 32));
+    eq = (uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(va, vb));
 
     if ((eq & 0x0000FFFFu) == 0x0000FFFFu)
       return p * 2;
