@@ -4,16 +4,10 @@
 
 struct lt__state lt__g = {0};
 
-int lt_init(void) {
-  if (lt__g.initialized)
-    return LT_ERR_INIT_ALREADY;
-  int rc = lt__plat_init();
-  if (rc != LT_OK)
-    return rc;
-
+static int lt__finish_init(void) {
   int w = 0, h = 0;
 
-  rc = lt__plat_get_size(&w, &h);
+  int rc = lt__plat_get_size(&w, &h);
   if (rc != LT_OK) {
     lt__plat_shutdown();
     return rc;
@@ -32,6 +26,24 @@ int lt_init(void) {
   lt__g.cur_attrs = 0xFFFFFFFF;
   lt__g.initialized = 1;
   return LT_OK;
+}
+
+int lt_init_fd(int ttyfd) {
+  if (lt__g.initialized)
+    return LT_ERR_INIT_ALREADY;
+  int rc = lt__plat_init_fd(ttyfd, 0);
+  if (rc != LT_OK)
+    return rc;
+  return lt__finish_init();
+}
+
+int lt_init(void) {
+  if (lt__g.initialized)
+    return LT_ERR_INIT_ALREADY;
+  int rc = lt__plat_init();
+  if (rc != LT_OK)
+    return rc;
+  return lt__finish_init();
 }
 
 int lt_shutdown(void) {

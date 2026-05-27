@@ -141,6 +141,10 @@ struct lt_event {
 
 /* ---- lifecycle ---- */
 LT_API int lt_init(void);
+/* Initialize against a caller-supplied terminal fd (POSIX). The fd must be a
+ * tty (validated with isatty); it is NOT closed by lt_shutdown — the caller
+ * owns it. On non-POSIX platforms this returns LT_ERR_INIT_OPEN. */
+LT_API int lt_init_fd(int ttyfd);
 LT_API int lt_shutdown(void);
 
 /* ---- screen ---- */
@@ -155,6 +159,10 @@ LT_API int lt_show_cursor(void);
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
 
 /* ---- input ---- */
+/* Event reads return LT_OK with an event, or LT_ERR_NO_EVENT when none is
+ * available (poll timeout / interrupted). On a genuine I/O failure they return
+ * the real error (LT_ERR_READ / LT_ERR_POLL) — failures are never masked as
+ * "no event". Before lt_init they return LT_ERR_NOT_INIT. */
 LT_API int lt_poll_event(struct lt_event *event);
 LT_API int lt_peek_event(struct lt_event *event, int timeout_ms);
 

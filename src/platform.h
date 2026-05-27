@@ -14,6 +14,10 @@
 
 /* ---- lifecycle ---- */
 int lt__plat_init(void);
+/* Initialize the platform layer against an already-open tty fd. `owned`
+ * non-zero means the platform closes the fd on shutdown; zero means the caller
+ * retains ownership. */
+int lt__plat_init_fd(int ttyfd, int owned);
 int lt__plat_shutdown(void);
 
 /* ---- terminal size ---- */
