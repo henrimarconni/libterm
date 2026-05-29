@@ -93,6 +93,51 @@ int main(void) {
   drain(master);
   assert(contains("38;2;255;128;0"));
 
+  /* (still in LT_OUTPUT_TRUECOLOR from Task 1's last phase, cur_fg == 0xFF8000)
+
+     IMPORTANT — the SGR cache: lt__plat_emit_sgr short-circuits when
+     (fg,bg,attrs) equals the last-emitted (cur_fg/cur_bg/cur_attrs), so a phase
+     whose fg repeats the previous cell's fg emits NO color bytes and its
+     isolated frame would miss the payload. Every phase below therefore uses an
+     fg value distinct from the immediately-preceding cell:
+       x3 (Task 1) 0xFF8000 -> x4 0x0A141E -> x5 0x80000000 -> x6 0 -> x7 0x80000000
+     (x5 and x7 share 0x80000000 but are separated by x6=0, so each re-emits). */
+
+  /* LT_RGB packs a distinct 24-bit value -> 38;2;10;20;30 (validates the macro) */
+  g_len = 0;
+  assert(lt_set_cell(4, 0, 't', LT_RGB(10, 20, 30), LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;2;10;20;30"));
+
+  /* 256 palette black via the sentinel -> 38;5;0 (cur_fg was 0x0A141E) */
+  lt_set_output_mode(LT_OUTPUT_256);
+  g_len = 0;
+  assert(lt_set_cell(5, 0, 'h', LT_HI_BLACK, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;0"));
+
+  /* truecolor terminal-default fg (0, no HI_BLACK) -> clean frame "ESC[39m",
+   * and the frame must NOT contain a 38;2;... RGB sequence (cur_fg was
+   * 0x80000000, so this re-emits) */
+  lt_set_output_mode(LT_OUTPUT_TRUECOLOR);
+  g_len = 0;
+  assert(lt_set_cell(6, 0, 'd', LT_DEFAULT, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("\x1b[39m"));
+  assert(!contains("38;2"));
+
+  /* truecolor real black via the sentinel -> 38;2;0;0;0 (cur_fg was 0, so this
+   * re-emits even though 0x80000000 matches the x5 256-mode cell) */
+  g_len = 0;
+  assert(lt_set_cell(7, 0, 'k', LT_RGB(0, 0, 0) | LT_HI_BLACK, LT_DEFAULT) ==
+         LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;2;0;0;0"));
+
   assert(lt_shutdown() == LT_OK);
   close(slave);
   close(master);
