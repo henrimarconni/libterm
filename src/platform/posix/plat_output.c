@@ -217,15 +217,6 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   if (mode == LT_OUTPUT_CURRENT)
     mode = LT_OUTPUT_NORMAL;
 
-  bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-                  mode == LT_OUTPUT_GRAYSCALE);
-
-  lt_attr fg_color = fg & LT__COLOR_MASK;
-  lt_attr bg_color = bg & LT__COLOR_MASK;
-  /* A 0 color with no HI_BLACK sentinel means "terminal default". */
-  bool fg_default = (fg_color == 0) && !(fg & LT_HI_BLACK);
-  bool bg_default = (bg_color == 0) && !(bg & LT_HI_BLACK);
-
   size_t pos = 0;
   p[pos++] = '\x1b';
   p[pos++] = '[';
@@ -245,6 +236,11 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
 
   /* fg */
   if (need_reset || fg != lt__g.cur_fg) {
+    lt_attr fg_color = fg & LT__COLOR_MASK;
+    /* A 0 color with no HI_BLACK sentinel means "terminal default". */
+    bool fg_default = (fg_color == 0) && !(fg & LT_HI_BLACK);
+    bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+                    mode == LT_OUTPUT_GRAYSCALE);
     if (fg_default) {
       lt__posix_emit_sep(p, &pos, &wrote_any);
       p[pos++] = '3';
@@ -267,6 +263,10 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
 
   /* bg */
   if (need_reset || bg != lt__g.cur_bg) {
+    lt_attr bg_color = bg & LT__COLOR_MASK;
+    bool bg_default = (bg_color == 0) && !(bg & LT_HI_BLACK);
+    bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+                    mode == LT_OUTPUT_GRAYSCALE);
     if (bg_default) {
       lt__posix_emit_sep(p, &pos, &wrote_any);
       p[pos++] = '4';
