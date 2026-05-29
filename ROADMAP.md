@@ -151,11 +151,11 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
-Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`. Emitted on POSIX via mode-aware SGR in `lt__plat_emit_sgr`; Windows still pending.
+Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`, plus `LT_RGB(r,g,b)` (24-bit pack) and the `LT_HI_BLACK` sentinel. Emitted on POSIX via mode-aware SGR in `lt__plat_emit_sgr` — named (NORMAL), 8-bit palette index (256/216/grayscale), and 24-bit RGB (TRUECOLOR), with `LT_HI_BLACK` distinguishing the terminal default from real black; emitted bytes asserted in `tests/test_posix_sgr_output.c`. Windows still pending.
 
 ### Attributes (`TB_BOLD/UNDERLINE/…` → `LT_BOLD/UNDERLINE/…`)
 
-Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE`. Emitted on POSIX SGR path; Windows still pending.
+Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE` (bits 24-30, above the 24-bit color field). Emitted on POSIX SGR path; Windows still pending.
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
@@ -163,7 +163,7 @@ Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. 
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 
-Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. Consumed on POSIX SGR path; Windows stores-only.
+Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. All emit correct SGR on the POSIX path — 24-bit truecolor and 8-bit palette indices, byte-tested in `tests/test_posix_sgr_output.c`; Windows stores-only.
 
 ### Function-hook ids (`TB_FUNC_*` → `LT_FUNC_*`)
 
@@ -179,7 +179,7 @@ Not declared. Dependent on `lt_set_func`.
 
 | termbox2 | libterm | Status |
 |---|---|---|
-| `uintattr_t` | `lt_attr` (`uint32_t`) | declared and used everywhere |
+| `uintattr_t` | `lt_attr` (`uint32_t`) | declared and used everywhere; layout: color bits 0-23, attribute bits 24-30, `LT_HI_BLACK` bit 31 |
 | *(termbox2 uses `uint32_t` directly)* | `lt_uchar` (`uint32_t`) | libterm-internal alias for codepoints |
 | `struct tb_cell` | `struct lt_cell` (`ch`, `fg`, `bg`) | declared; termbox2's optional `ech`/`nech`/`cech` (EGC) fields not present |
 | `struct tb_event` | `struct lt_event` (`type`, `mod`, `key`, `ch`, `w`, `h`, `x`, `y`) | declared; matches termbox2 layout |
@@ -221,7 +221,7 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
 3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
 4. **Public API surface still trails termbox2.** `lt_init_file` / `lt_init_rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared. (`lt_init_fd` is now declared and implemented on POSIX.)
-5. **Output-mode parity remains platform-skewed.** POSIX consumes normal/256/216/grayscale/truecolor in SGR emission; Windows still has stores-only output-mode behavior.
+5. **Output-mode parity remains platform-skewed.** POSIX emits correct SGR for all modes incl. 24-bit truecolor and the `LT_HI_BLACK` sentinel (byte-tested); Windows still has stores-only output-mode behavior.
 
 ---
 
