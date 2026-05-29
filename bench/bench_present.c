@@ -145,8 +145,9 @@ static void workload_sgr_truecolor(int frame_index) {
     for (int x = 0; x < w; x++) {
       lt_attr fg = LT_RGB((x + frame_index) & 0xFF, (y + frame_index) & 0xFF,
                           (x + y + frame_index) & 0xFF);
-      lt_attr bg = LT_RGB((y + frame_index) & 0xFF, (x + y + frame_index) & 0xFF,
-                          (x + frame_index) & 0xFF);
+      lt_attr bg =
+          LT_RGB((y + frame_index) & 0xFF, (x + y + frame_index) & 0xFF,
+                 (x + frame_index) & 0xFF);
       lt_set_cell(x, y, ch, fg, bg);
     }
   }
@@ -160,7 +161,8 @@ static void workload_sgr_256(int frame_index) {
   char ch = (char)('A' + (frame_index & 15));
 
   /* 256-palette: animate fg AND bg indices in 1..255 (avoid 0 = default) so
-   * every cell re-emits and drives write_uint twice per cell (38;5;i + 48;5;i). */
+   * every cell re-emits and drives write_uint twice per cell (38;5;i + 48;5;i).
+   */
   lt_set_output_mode(LT_OUTPUT_256);
   for (int y = 0; y < h; y++) {
     for (int x = 0; x < w; x++) {
@@ -205,7 +207,7 @@ static const struct workload_case k_workloads[] = {
     {"box_redraw", workload_box_redraw},
     {"sgr_rainbow", workload_sgr_rainbow},
     {"sgr_attrs", workload_sgr_attrs},
-    {"sgr_truecolor", workload_sgr_truecolor},
+    {"sgr_tcolor", workload_sgr_truecolor},
     {"sgr_256", workload_sgr_256},
 };
 
