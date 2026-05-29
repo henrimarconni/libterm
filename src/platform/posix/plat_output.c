@@ -176,12 +176,13 @@ static void lt__posix_emit_sep(char *p, size_t *pos, bool *wrote_any) {
   *wrote_any = true;
 }
 
-/* Resolve the final 0-255 SGR palette index for an indexed output mode, matching
- * termbox2 (termbox2.h:3810-3826): OUTPUT_216 maps 1..216 into the 6x6x6 color
- * cube (16..231); OUTPUT_GRAYSCALE maps 1..24 into the gray ramp (232..255);
- * OUTPUT_256 (and anything else) uses the raw low-byte index. Out-of-range values
- * clamp to the top of the range before the offset. The caller handles the
- * default/HI_BLACK cases, so this only runs for real colors. */
+/* Resolve the final 0-255 SGR palette index for an indexed output mode,
+ * matching termbox2 (termbox2.h:3810-3826): OUTPUT_216 maps 1..216 into the
+ * 6x6x6 color cube (16..231); OUTPUT_GRAYSCALE maps 1..24 into the gray ramp
+ * (232..255); OUTPUT_256 (and anything else) uses the raw low-byte index.
+ * Out-of-range values clamp to the top of the range before the offset. The
+ * caller handles the default/HI_BLACK cases, so this only runs for real colors.
+ */
 static int lt__palette_index(int mode, lt_attr v) {
   int c = (int)(v & 0xFF);
   if (mode == LT_OUTPUT_216) {
@@ -239,7 +240,8 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
 
   /* Depends only on mode, so compute once (after the no-change early return).
    * The per-fg/bg color masks stay inside their branches — those depend on the
-   * fg/bg values and are wasted work on a span that re-emits only one of them. */
+   * fg/bg values and are wasted work on a span that re-emits only one of them.
+   */
   bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
                   mode == LT_OUTPUT_GRAYSCALE);
 
