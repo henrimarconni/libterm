@@ -28,7 +28,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_height` | `lt_height` | [x] | [x] | Reads cached `lt__g.height` |
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
 | `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | Returns `LT_ERR_NOT_INIT` before `lt_init` (consistent with `lt_clear`/`lt_present`/`lt_set_cell`) |
-| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX now emits mode-aware SGR (normal/256/216/grayscale/truecolor); Windows render path remains glyph-focused |
+| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX emits mode-aware SGR for all five output modes — normal/256/216/grayscale/truecolor — with a `LT_HI_BLACK` sentinel separating terminal-default from real black (output bytes asserted in `tests/test_posix_sgr_output.c`); Windows render path remains glyph-focused |
 | `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
 | `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
 | `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
@@ -240,6 +240,6 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 3. POSIX and Windows produce identical `lt_event` sequences for the same physical key, mouse, and resize input.
 4. `lt_present` is diff-based and emits zero bytes when no cell has changed.
 5. UTF-8 input and output round-trip correctly for 1–4-byte sequences and grapheme clusters.
-6. All four output color modes render correctly on Windows Terminal, xterm, tmux, macOS Terminal, and the Linux console.
+6. All four output color modes render correctly on Windows Terminal, xterm, tmux, macOS Terminal, and the Linux console. POSIX SGR byte-correctness for all modes is implemented and tested (`tests/test_posix_sgr_output.c`); cross-terminal visual confirmation and the Windows SGR path remain.
 7. Sanitizer CI is green (Linux gcc + clang, Windows MSVC); fuzzer runs an hour without crashes; valgrind reports no leaks.
 8. `compat/termbox2.h` drop-in layer exists and a non-trivial example (small text editor) builds against it.
