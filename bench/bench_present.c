@@ -133,6 +133,47 @@ static void workload_sgr_attrs(int frame_index) {
   g_sink += (uint64_t)(frame_index & 1);
 }
 
+static void workload_sgr_truecolor(int frame_index) {
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
+  char ch = (char)('A' + (frame_index & 15));
+
+  /* Truecolor: animate distinct 24-bit fg AND bg per cell so every cell starts
+   * a fresh SGR run and re-emits each frame, driving write_uint up to 6x/cell
+   * (38;2;R;G;B for fg + 48;2;R;G;B for bg). */
+  lt_set_output_mode(LT_OUTPUT_TRUECOLOR);
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      lt_attr fg = LT_RGB((x + frame_index) & 0xFF, (y + frame_index) & 0xFF,
+                          (x + y + frame_index) & 0xFF);
+      lt_attr bg = LT_RGB((y + frame_index) & 0xFF, (x + y + frame_index) & 0xFF,
+                          (x + frame_index) & 0xFF);
+      lt_set_cell(x, y, ch, fg, bg);
+    }
+  }
+
+  lt_present();
+  g_sink += (uint64_t)(frame_index & 1);
+}
+
+static void workload_sgr_256(int frame_index) {
+  const int w = LIBTERM_BENCH_WIDTH, h = LIBTERM_BENCH_HEIGHT;
+  char ch = (char)('A' + (frame_index & 15));
+
+  /* 256-palette: animate fg AND bg indices in 1..255 (avoid 0 = default) so
+   * every cell re-emits and drives write_uint twice per cell (38;5;i + 48;5;i). */
+  lt_set_output_mode(LT_OUTPUT_256);
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      lt_attr fg = (lt_attr)(((x + y + frame_index) % 255) + 1);
+      lt_attr bg = (lt_attr)(((x * 2 + y + frame_index) % 255) + 1);
+      lt_set_cell(x, y, ch, fg, bg);
+    }
+  }
+
+  lt_present();
+  g_sink += (uint64_t)(frame_index & 1);
+}
+
 static uint64_t now_ns(void) {
 #if defined(_WIN32)
   LARGE_INTEGER freq;
@@ -164,6 +205,8 @@ static const struct workload_case k_workloads[] = {
     {"box_redraw", workload_box_redraw},
     {"sgr_rainbow", workload_sgr_rainbow},
     {"sgr_attrs", workload_sgr_attrs},
+    {"sgr_truecolor", workload_sgr_truecolor},
+    {"sgr_256", workload_sgr_256},
 };
 
 #define k_workloads_count (sizeof(k_workloads) / sizeof(k_workloads[0]))
