@@ -209,13 +209,22 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   if (fg == lt__g.cur_fg && bg == lt__g.cur_bg && attrs == lt__g.cur_attrs)
     return LT_OK;
 
-  char *p = lt__plat_reserve(32);
+  char *p = lt__plat_reserve(64);
   if (!p)
     return LT_ERR;
 
   int mode = lt__g.output_mode;
   if (mode == LT_OUTPUT_CURRENT)
     mode = LT_OUTPUT_NORMAL;
+
+  bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+                  mode == LT_OUTPUT_GRAYSCALE);
+
+  lt_attr fg_color = fg & LT__COLOR_MASK;
+  lt_attr bg_color = bg & LT__COLOR_MASK;
+  /* A 0 color with no HI_BLACK sentinel means "terminal default". */
+  bool fg_default = (fg_color == 0) && !(fg & LT_HI_BLACK);
+  bool bg_default = (bg_color == 0) && !(bg & LT_HI_BLACK);
 
   size_t pos = 0;
   p[pos++] = '\x1b';
@@ -236,16 +245,19 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
 
   /* fg */
   if (need_reset || fg != lt__g.cur_fg) {
-    if (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-        mode == LT_OUTPUT_GRAYSCALE) {
-      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 1, fg);
+    if (fg_default) {
+      lt__posix_emit_sep(p, &pos, &wrote_any);
+      p[pos++] = '3';
+      p[pos++] = '9';
+    } else if (indexed) {
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 1, fg_color);
     } else if (mode == LT_OUTPUT_TRUECOLOR) {
-      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 1, fg);
+      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 1, fg_color);
     } else {
       lt__posix_emit_sep(p, &pos, &wrote_any);
-      if (fg >= LT_BLACK && fg <= LT_WHITE) {
+      if (fg_color >= LT_BLACK && fg_color <= LT_WHITE) {
         p[pos++] = '3';
-        p[pos++] = (char)('0' + (fg - LT_BLACK));
+        p[pos++] = (char)('0' + (fg_color - LT_BLACK));
       } else {
         p[pos++] = '3';
         p[pos++] = '9';
@@ -254,21 +266,20 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   }
 
   /* bg */
-  bool skip_bg_256_default = !need_reset && bg == LT_DEFAULT &&
-                             bg == lt__g.cur_bg &&
-                             (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-                              mode == LT_OUTPUT_GRAYSCALE);
-  if (!skip_bg_256_default && (need_reset || bg != lt__g.cur_bg)) {
-    if (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-        mode == LT_OUTPUT_GRAYSCALE) {
-      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 0, bg);
+  if (need_reset || bg != lt__g.cur_bg) {
+    if (bg_default) {
+      lt__posix_emit_sep(p, &pos, &wrote_any);
+      p[pos++] = '4';
+      p[pos++] = '9';
+    } else if (indexed) {
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 0, bg_color);
     } else if (mode == LT_OUTPUT_TRUECOLOR) {
-      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 0, bg);
+      lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 0, bg_color);
     } else {
       lt__posix_emit_sep(p, &pos, &wrote_any);
-      if (bg >= LT_BLACK && bg <= LT_WHITE) {
+      if (bg_color >= LT_BLACK && bg_color <= LT_WHITE) {
         p[pos++] = '4';
-        p[pos++] = (char)('0' + (bg - LT_BLACK));
+        p[pos++] = (char)('0' + (bg_color - LT_BLACK));
       } else {
         p[pos++] = '4';
         p[pos++] = '9';
@@ -324,9 +335,9 @@ int lt__plat_render_run(const struct lt_cell *cells, int count) {
 
   int i = 0, j = 0;
   while (i < count) {
-    span_fg = cells[i].fg & 0x00FF;
-    span_bg = cells[i].bg & 0x00FF;
-    span_attrs = cells[i].fg & 0xFF00;
+    span_fg = cells[i].fg & (LT__COLOR_MASK | LT_HI_BLACK);
+    span_bg = cells[i].bg & (LT__COLOR_MASK | LT_HI_BLACK);
+    span_attrs = cells[i].fg & LT__ATTR_MASK;
 
     if (span_fg != lt__g.cur_fg || span_bg != lt__g.cur_bg ||
         span_attrs != lt__g.cur_attrs) {
@@ -341,9 +352,9 @@ int lt__plat_render_run(const struct lt_cell *cells, int count) {
 
     j = i + 1;
     while (j < count) {
-      if ((cells[j].fg & 0x00FF) != span_fg ||
-          (cells[j].bg & 0x00FF) != span_bg ||
-          (cells[j].fg & 0xFF00) != span_attrs)
+      if ((cells[j].fg & (LT__COLOR_MASK | LT_HI_BLACK)) != span_fg ||
+          (cells[j].bg & (LT__COLOR_MASK | LT_HI_BLACK)) != span_bg ||
+          (cells[j].fg & LT__ATTR_MASK) != span_attrs)
         break;
       j++;
     }

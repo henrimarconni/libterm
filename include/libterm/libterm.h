@@ -110,14 +110,27 @@ extern "C" {
 #define LT_WHITE 0x0008
 
 /* ---- attributes ---- */
-/* Attribute bits are OR'd into fg only, high bits of bg are ignored */
-#define LT_BOLD 0x0100
-#define LT_UNDERLINE 0x0200
-#define LT_REVERSE 0x0400
-#define LT_ITALIC 0x0800
-#define LT_BLINK 0x1000
-#define LT_DIM 0x2000
-#define LT_STRIKE 0x4000
+/* Color occupies bits 0-23 of fg/bg (24-bit RGB in TRUECOLOR mode, an 8-bit
+ * palette index in 256/216/GRAYSCALE, a named color 0-8 in NORMAL). The 7
+ * attribute bits live in bits 24-30 and are OR'd into fg only; the attribute
+ * bits of bg are ignored. */
+#define LT_BOLD 0x01000000u
+#define LT_UNDERLINE 0x02000000u
+#define LT_REVERSE 0x04000000u
+#define LT_ITALIC 0x08000000u
+#define LT_BLINK 0x10000000u
+#define LT_DIM 0x20000000u
+#define LT_STRIKE 0x40000000u
+
+/* Sentinel (bit 31). A color whose bits 0-23 are 0 means "use the terminal
+ * default"; OR in LT_HI_BLACK to select real black (palette index 0 or RGB
+ * 0,0,0) instead. Mirrors termbox2's TB_HI_BLACK. */
+#define LT_HI_BLACK 0x80000000u
+
+/* Pack a 24-bit RGB color into bits 0-23 for LT_OUTPUT_TRUECOLOR. */
+#define LT_RGB(r, g, b)                                                        \
+  ((lt_attr)((((lt_attr)(r) & 0xFFu) << 16) | (((lt_attr)(g) & 0xFFu) << 8) |  \
+             ((lt_attr)(b) & 0xFFu)))
 
 /* ---- types ---- */
 typedef uint32_t lt_uchar;

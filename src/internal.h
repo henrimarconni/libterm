@@ -28,6 +28,10 @@ struct lt__render_stats {
 };
 #endif
 
+/* ---- fg/bg bit layout (see LT_* macros in libterm.h) ---- */
+#define LT__COLOR_MASK 0x00FFFFFFu /* bits 0-23: color value */
+#define LT__ATTR_MASK 0x7F000000u  /* bits 24-30: the 7 attribute bits */
+
 /* ---- global state (single terminal instance) ---- */
 
 struct lt__state {
@@ -39,9 +43,9 @@ struct lt__state {
   int output_mode;
   int cur_x;
   int cur_y;
-  lt_attr cur_fg;    /* SGR cache: last-emitted fg color (low byte) */
-  lt_attr cur_bg;    /* SGR cache: last-emitted bg color (low byte) */
-  lt_attr cur_attrs; /* SGR cache: last-emitted attr bits (high byte of fg) */
+  lt_attr cur_fg;    /* SGR cache: last-emitted fg (color bits 0-23 + HI_BLACK) */
+  lt_attr cur_bg;    /* SGR cache: last-emitted bg (color bits 0-23 + HI_BLACK) */
+  lt_attr cur_attrs; /* SGR cache: last-emitted attr bits (LT__ATTR_MASK) */
   lt_attr clear_fg;
   lt_attr clear_bg;
   struct lt_cell *back;  /* back buffer  (w*h cells) */
