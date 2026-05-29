@@ -217,6 +217,12 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   if (mode == LT_OUTPUT_CURRENT)
     mode = LT_OUTPUT_NORMAL;
 
+  /* Depends only on mode, so compute once (after the no-change early return).
+   * The per-fg/bg color masks stay inside their branches — those depend on the
+   * fg/bg values and are wasted work on a span that re-emits only one of them. */
+  bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
+                  mode == LT_OUTPUT_GRAYSCALE);
+
   size_t pos = 0;
   p[pos++] = '\x1b';
   p[pos++] = '[';
@@ -239,8 +245,6 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
     lt_attr fg_color = fg & LT__COLOR_MASK;
     /* A 0 color with no HI_BLACK sentinel means "terminal default". */
     bool fg_default = (fg_color == 0) && !(fg & LT_HI_BLACK);
-    bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-                    mode == LT_OUTPUT_GRAYSCALE);
     if (fg_default) {
       lt__posix_emit_sep(p, &pos, &wrote_any);
       p[pos++] = '3';
@@ -265,8 +269,6 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   if (need_reset || bg != lt__g.cur_bg) {
     lt_attr bg_color = bg & LT__COLOR_MASK;
     bool bg_default = (bg_color == 0) && !(bg & LT_HI_BLACK);
-    bool indexed = (mode == LT_OUTPUT_256 || mode == LT_OUTPUT_216 ||
-                    mode == LT_OUTPUT_GRAYSCALE);
     if (bg_default) {
       lt__posix_emit_sep(p, &pos, &wrote_any);
       p[pos++] = '4';
