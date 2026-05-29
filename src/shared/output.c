@@ -161,6 +161,13 @@ int lt_show_cursor(void) {
 int lt_set_output_mode(int mode) {
   if (mode == LT_OUTPUT_CURRENT)
     return lt__g.output_mode;
+  /* A mode change re-interprets color values, so the SGR cache (which keys on
+   * color/attr values, not mode) must be invalidated to force re-emission. */
+  if (mode != lt__g.output_mode) {
+    lt__g.cur_fg = 0xFFFFFFFF;
+    lt__g.cur_bg = 0xFFFFFFFF;
+    lt__g.cur_attrs = 0xFFFFFFFF;
+  }
   lt__g.output_mode = mode;
   return mode;
 }
