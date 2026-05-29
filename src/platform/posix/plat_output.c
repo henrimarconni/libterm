@@ -176,9 +176,29 @@ static void lt__posix_emit_sep(char *p, size_t *pos, bool *wrote_any) {
   *wrote_any = true;
 }
 
+/* Resolve the final 0-255 SGR palette index for an indexed output mode, matching
+ * termbox2 (termbox2.h:3810-3826): OUTPUT_216 maps 1..216 into the 6x6x6 color
+ * cube (16..231); OUTPUT_GRAYSCALE maps 1..24 into the gray ramp (232..255);
+ * OUTPUT_256 (and anything else) uses the raw low-byte index. Out-of-range values
+ * clamp to the top of the range before the offset. The caller handles the
+ * default/HI_BLACK cases, so this only runs for real colors. */
+static int lt__palette_index(int mode, lt_attr v) {
+  int c = (int)(v & 0xFF);
+  if (mode == LT_OUTPUT_216) {
+    if (c > 216)
+      c = 216;
+    return c + 0x0F;
+  }
+  if (mode == LT_OUTPUT_GRAYSCALE) {
+    if (c > 24)
+      c = 24;
+    return c + 0xE7;
+  }
+  return c;
+}
+
 static void lt__posix_emit_sgr_256(char *p, size_t *pos, bool *wrote_any,
-                                   int is_fg, lt_attr v) {
-  int idx = (int)(v & 0xFF);
+                                   int is_fg, int idx) {
   lt__posix_emit_sep(p, pos, wrote_any);
   *pos += (size_t)lt__posix_write_uint(p + *pos, is_fg ? 38 : 48);
   p[(*pos)++] = ';';
@@ -250,7 +270,8 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
       p[pos++] = '3';
       p[pos++] = '9';
     } else if (indexed) {
-      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 1, fg_color);
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 1,
+                             lt__palette_index(mode, fg_color));
     } else if (mode == LT_OUTPUT_TRUECOLOR) {
       lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 1, fg_color);
     } else {
@@ -274,7 +295,8 @@ static int lt__plat_emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
       p[pos++] = '4';
       p[pos++] = '9';
     } else if (indexed) {
-      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 0, bg_color);
+      lt__posix_emit_sgr_256(p, &pos, &wrote_any, 0,
+                             lt__palette_index(mode, bg_color));
     } else if (mode == LT_OUTPUT_TRUECOLOR) {
       lt__posix_emit_sgr_truecolor(p, &pos, &wrote_any, 0, bg_color);
     } else {

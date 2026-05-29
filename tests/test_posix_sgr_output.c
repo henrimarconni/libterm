@@ -158,6 +158,42 @@ int main(void) {
   drain(master);
   assert(contains("38;2;255;128;0"));
 
+  /* 216-color cube: index i in 1..216 maps to palette i + 0x0F (16..231);
+   * out-of-range clamps to 216 -> 231. (termbox2 OUTPUT_216 semantics.) */
+  lt_set_output_mode(LT_OUTPUT_216);
+  g_len = 0;
+  assert(lt_set_cell(10, 0, 'a', 1, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;16"));
+
+  g_len = 0;
+  assert(lt_set_cell(11, 0, 'b', 216, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;231"));
+
+  g_len = 0;
+  assert(lt_set_cell(12, 0, 'c', 255, LT_DEFAULT) == LT_OK); /* clamps to 216 */
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;231"));
+
+  /* Grayscale ramp: index i in 1..24 maps to palette i + 0xE7 (232..255);
+   * out-of-range clamps to 24 -> 255. (termbox2 OUTPUT_GRAYSCALE semantics.) */
+  lt_set_output_mode(LT_OUTPUT_GRAYSCALE);
+  g_len = 0;
+  assert(lt_set_cell(13, 0, 'd', 1, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;232"));
+
+  g_len = 0;
+  assert(lt_set_cell(14, 0, 'e', 24, LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;5;255"));
+
   assert(lt_shutdown() == LT_OK);
   close(slave);
   close(master);
