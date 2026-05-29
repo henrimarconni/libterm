@@ -126,7 +126,10 @@ int main(void) {
   assert(lt_set_cell(6, 0, 'd', LT_DEFAULT, LT_DEFAULT) == LT_OK);
   assert(lt_present() == LT_OK);
   drain(master);
-  assert(contains("\x1b[39m"));
+  /* The x5->x6 256->truecolor mode switch invalidates the SGR cache (W2 fix),
+   * so this default-fg frame is reset-framed ("\x1b[0;39;49m") rather than the
+   * bare "\x1b[39m". Assert the framing-robust ";39;" default-fg fragment. */
+  assert(contains(";39;"));
   assert(!contains("38;2"));
 
   /* truecolor real black via the sentinel -> 38;2;0;0;0 (cur_fg was 0, so this
@@ -137,6 +140,23 @@ int main(void) {
   assert(lt_present() == LT_OK);
   drain(master);
   assert(contains("38;2;0;0;0"));
+
+  /* W2: switching output mode WITHOUT changing the color value must still
+   * re-emit under the new mode. Set a value in 256 mode, then switch to
+   * truecolor and re-present the same fg value (only the glyph changes). The
+   * truecolor encoding must appear; before the cache-invalidation fix, emit_sgr
+   * short-circuits on fg == cur_fg and emits nothing. */
+  lt_set_output_mode(LT_OUTPUT_256);
+  g_len = 0;
+  assert(lt_set_cell(9, 0, 'm', LT_RGB(255, 128, 0), LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  lt_set_output_mode(LT_OUTPUT_TRUECOLOR);
+  g_len = 0;
+  assert(lt_set_cell(9, 0, 'M', LT_RGB(255, 128, 0), LT_DEFAULT) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain(master);
+  assert(contains("38;2;255;128;0"));
 
   assert(lt_shutdown() == LT_OK);
   close(slave);
