@@ -199,6 +199,11 @@ LT_API int lt_set_input_mode(int mode);
 
 LT_API int lt_set_output_mode(int mode);
 
+/* Inspect $COLORTERM / $TERM and return the best output mode the terminal
+ * appears to support: LT_OUTPUT_TRUECOLOR, LT_OUTPUT_256, or LT_OUTPUT_NORMAL.
+ * Stateless — safe to call before lt_init to decide the initial mode. */
+LT_API int lt_detect_color_depth(void);
+
 /* ---- UTF-8 helpers ---- */
 LT_API int lt_utf8_char_length(char c);
 LT_API int lt_utf8_char_to_unicode(uint32_t *out, const char *c);

@@ -79,7 +79,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 |---|---|---|---|---|
 | `tb_last_errno` | `lt_last_errno` | [ ] | [ ] | |
 | `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for **all 23** return codes (distinct messages + `"unknown error"` fallback); exhaustiveness + distinctness asserted in `tests/test_api.c` |
-| `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | |
+| `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | termbox2's is a compile-time flag; superseded for mode-selection by `lt_detect_color_depth` below |
+| *(libterm addition)* | `lt_detect_color_depth` | [x] | [x] | Stateless runtime query: inspects `$COLORTERM` (`truecolor`/`24bit`) then `$TERM` (`*256color*` substring) and returns the terminal's color ceiling as an `LT_OUTPUT_*` mode (truecolor/256/normal). Pure standard-C `getenv` in `src/shared/output.c` — no platform code, safe to call before `lt_init`. Byte-exact logic asserted by hermetic `setenv`-driven test `tests/test_detect_color_depth.c` (harness POSIX-only; the function itself is platform-agnostic) |
 | `tb_has_egc` | `lt_has_egc` | [ ] | [ ] | |
 | `tb_attr_width` | `lt_attr_width` | [ ] | [ ] | |
 | `tb_version` | `lt_version` | [x] | [x] | Returns `"0.1.0"` |
@@ -209,6 +210,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | Hand-rolled int-to-decimal in render path (no `snprintf`) | [x] | [x] `lt__plat_move_cursor` writes digits directly |
 | Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
 | SGR / color emission | [x] | [ ] |
+| Runtime color-depth detection (`lt_detect_color_depth`) | [x] `$COLORTERM`/`$TERM` → `LT_OUTPUT_*` ceiling; hermetic `setenv` test (`tests/test_detect_color_depth.c`), wired into `examples/truecolor.c` | [x] same standard-C path (test harness POSIX-only) |
 | Mouse events | [ ] | [ ] |
 
 ---

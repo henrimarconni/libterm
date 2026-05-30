@@ -4,8 +4,9 @@
  * combined with an attribute. Best viewed in a truecolor-capable terminal.
  * Press q or Esc to quit.
  *
- * Note: the output mode is interpreted globally at present time, so this demo
- * stays in LT_OUTPUT_TRUECOLOR for the whole frame.
+ * Note: the output mode is chosen at runtime via lt_detect_color_depth() and
+ * reported in the title bar; the RGB content only renders correctly under
+ * truecolor, so a lower-depth terminal shows the note but degraded color.
  */
 
 #include "libterm/libterm.h"
@@ -24,11 +25,18 @@ int main(void) {
     return 1;
   }
 
-  lt_set_output_mode(LT_OUTPUT_TRUECOLOR);
+  int depth = lt_detect_color_depth();
+  lt_set_output_mode(depth);
+  const char *depth_note =
+      depth == LT_OUTPUT_TRUECOLOR
+          ? "truecolor detected"
+          : (depth == LT_OUTPUT_256 ? "256-color detected" : "normal detected");
   lt_hide_cursor();
 
-  puts_at(2, 1, "libterm truecolor demo (press q or Esc to quit)", LT_DEFAULT,
-          LT_DEFAULT);
+  char title[128];
+  snprintf(title, sizeof title,
+           "libterm truecolor demo [%s] (press q or Esc to quit)", depth_note);
+  puts_at(2, 1, title, LT_DEFAULT, LT_DEFAULT);
 
   /* 24-bit RGB gradient: blue -> red across the row, drawn as cell
    * backgrounds (space glyphs). Each column is a distinct true color. */

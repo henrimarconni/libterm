@@ -2,6 +2,7 @@
 #include "intrinsics/diff.h"
 #include "platform.h"
 #include "string.h"
+#include <stdlib.h>
 
 static int lt__present_abort(int err) {
   static const char sync_end[] = "\x1b[?2026l";
@@ -170,4 +171,16 @@ int lt_set_output_mode(int mode) {
   }
   lt__g.output_mode = mode;
   return mode;
+}
+
+int lt_detect_color_depth(void) {
+  const char *ct = getenv("COLORTERM");
+  if (ct && (strcmp(ct, "truecolor") == 0 || strcmp(ct, "24bit") == 0))
+    return LT_OUTPUT_TRUECOLOR;
+
+  const char *term = getenv("TERM");
+  if (term && strstr(term, "256color"))
+    return LT_OUTPUT_256;
+
+  return LT_OUTPUT_NORMAL;
 }
