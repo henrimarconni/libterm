@@ -4,30 +4,46 @@
 #include <assert.h>
 #include <stdlib.h>
 
+/* Portable env helpers: POSIX setenv/unsetenv are unavailable in the MinGW
+ * CRT, so map onto _putenv_s on Windows. Setting an empty value removes the
+ * variable there, which matches unsetenv for lt_detect_color_depth's getenv
+ * checks. */
+#ifdef _WIN32
+static void set_env(const char *name, const char *value) {
+  _putenv_s(name, value);
+}
+static void unset_env(const char *name) { _putenv_s(name, ""); }
+#else
+static void set_env(const char *name, const char *value) {
+  setenv(name, value, 1);
+}
+static void unset_env(const char *name) { unsetenv(name); }
+#endif
+
 int main(void) {
-  unsetenv("TERM");
-  setenv("COLORTERM", "truecolor", 1);
+  unset_env("TERM");
+  set_env("COLORTERM", "truecolor");
   assert(lt_detect_color_depth() == LT_OUTPUT_TRUECOLOR);
 
-  setenv("COLORTERM", "24bit", 1);
+  set_env("COLORTERM", "24bit");
   assert(lt_detect_color_depth() == LT_OUTPUT_TRUECOLOR);
 
-  setenv("COLORTERM", "gnome-terminal", 1);
-  setenv("TERM", "xterm-256color", 1);
+  set_env("COLORTERM", "gnome-terminal");
+  set_env("TERM", "xterm-256color");
   assert(lt_detect_color_depth() == LT_OUTPUT_256);
 
-  unsetenv("COLORTERM");
-  setenv("TERM", "screen-256color", 1);
+  unset_env("COLORTERM");
+  set_env("TERM", "screen-256color");
   assert(lt_detect_color_depth() == LT_OUTPUT_256);
 
-  setenv("TERM", "xterm", 1);
+  set_env("TERM", "xterm");
   assert(lt_detect_color_depth() == LT_OUTPUT_NORMAL);
 
-  setenv("TERM", "dumb", 1);
+  set_env("TERM", "dumb");
   assert(lt_detect_color_depth() == LT_OUTPUT_NORMAL);
 
-  unsetenv("COLORTERM");
-  unsetenv("TERM");
+  unset_env("COLORTERM");
+  unset_env("TERM");
   assert(lt_detect_color_depth() == LT_OUTPUT_NORMAL);
 
   return 0;
