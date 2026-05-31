@@ -9,6 +9,9 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+/* Defined below with the rest of the input-mode pending machinery. */
+static void lt__posix_pending_push(const unsigned char *bytes, size_t n);
+
 static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
                                        size_t want) {
   size_t len = have;
@@ -32,6 +35,15 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
     ssize_t n = read(ttyfd, &buf[len], 1);
     if (n != 1)
       break;
+
+    /* A byte that isn't a UTF-8 continuation (10xxxxxx) does not belong to this
+     * sequence. Stash it for re-delivery as its own event and stop, so the
+     * partial sequence decodes to U+FFFD without swallowing the next keypress. */
+    if ((buf[len] & 0xC0) != 0x80) {
+      unsigned char stray = buf[len];
+      lt__posix_pending_push(&stray, 1);
+      break;
+    }
 
     len++;
   }

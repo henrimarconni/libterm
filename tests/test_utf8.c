@@ -131,5 +131,29 @@ int main(void) {
     expect_bad(s, sizeof(s));
   }
 
+  /* invalid: 0xC1 overlong 2-byte lead (only 0xC2..0xDF are legal) */
+  {
+    const unsigned char s[] = {0xC1, 0xBF};
+    expect_bad(s, sizeof(s));
+  }
+
+  /* boundary: U+D7FF — last codepoint just below the surrogate block, valid */
+  {
+    const unsigned char s[] = {0xED, 0x9F, 0xBF};
+    expect_ok(s, sizeof(s), 3, (lt_uchar)0xD7FF);
+  }
+
+  /* boundary: U+E000 — first codepoint just above the surrogate block, valid */
+  {
+    const unsigned char s[] = {0xEE, 0x80, 0x80};
+    expect_ok(s, sizeof(s), 3, (lt_uchar)0xE000);
+  }
+
+  /* boundary: U+10FFFF — the maximum valid scalar value */
+  {
+    const unsigned char s[] = {0xF4, 0x8F, 0xBF, 0xBF};
+    expect_ok(s, sizeof(s), 4, (lt_uchar)0x10FFFF);
+  }
+
   return 0;
 }
