@@ -9,8 +9,22 @@
 #include <sys/select.h>
 #include <unistd.h>
 
-/* Defined below with the rest of the input-mode pending machinery. */
-static void lt__posix_pending_push(const unsigned char *bytes, size_t n);
+/* Bytes pending re-delivery as standalone events, replayed one at a time on the
+ * following reads. Two producers stash here: LT_INPUT_ESC (an unrecognized
+ * ESC-prefixed combo emits LT_KEY_ESC, then the trailing byte) and the UTF-8
+ * assembler (a stray non-continuation byte, instead of swallowing it). The
+ * consumer, lt__posix_pending_pop, sits lower down next to where it is drained. */
+static unsigned char lt__posix_pending[8];
+static size_t lt__posix_pending_len = 0;
+static size_t lt__posix_pending_pos = 0;
+
+static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
+  if (n > sizeof(lt__posix_pending))
+    n = sizeof(lt__posix_pending);
+  memcpy(lt__posix_pending, bytes, n);
+  lt__posix_pending_len = n;
+  lt__posix_pending_pos = 0;
+}
 
 static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
                                        size_t want) {
@@ -260,21 +274,6 @@ static bool lt__posix_ctrl_byte_event(unsigned char b, struct lt_event *ev) {
   ev->key = (uint16_t)b;
   ev->ch = 0;
   return true;
-}
-
-/* Bytes pending re-delivery as standalone events. Used by LT_INPUT_ESC: an
- * unrecognized ESC-prefixed combo emits LT_KEY_ESC first, then the trailing
- * byte(s) are replayed here one event at a time on the following reads. */
-static unsigned char lt__posix_pending[8];
-static size_t lt__posix_pending_len = 0;
-static size_t lt__posix_pending_pos = 0;
-
-static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
-  if (n > sizeof(lt__posix_pending))
-    n = sizeof(lt__posix_pending);
-  memcpy(lt__posix_pending, bytes, n);
-  lt__posix_pending_len = n;
-  lt__posix_pending_pos = 0;
 }
 
 /* Fill `ev` from the next pending byte. Returns true while bytes remain. Alt
