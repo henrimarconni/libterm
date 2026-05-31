@@ -136,10 +136,10 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | Key group | POSIX | Windows |
 |---|---|---|
 | Arrows + ESC | [x] | [x] |
-| `ENTER` / `BACKSPACE` / `TAB` / `SPACE` | [~] (raw byte path) | [x] |
+| `ENTER` / `BACKSPACE` / `TAB` / `SPACE` | [x] | [x] | ENTER/TAB/BACKSPACE now report as key codes (termbox2 control-byte model); SPACE is a printable char (`ch == 0x20`) |
 | F1–F12 | [x] (common xterm CSI/SS3 sequences) | [x] |
 | `INSERT` / `DELETE` / `HOME` / `END` / `PGUP` / `PGDN` | [x] | [x] |
-| Ctrl+letter (`TB_KEY_CTRL_A` … termbox2 set) | [ ] | [ ] |
+| Ctrl+letter (`LT_KEY_CTRL_A` … termbox2 set) | [x] | [x] | A standalone control byte (`0x00-0x1F`, `0x7F`) → `ev->key` = the byte, `ch == 0`, `mod == 0`, identically on both platforms. `LT_KEY_CTRL_*` declared in `libterm.h`; POSIX byte mapping unit-tested in `tests/test_posix_input_parse.c` |
 
 ### Modifiers (`TB_MOD_*` → `LT_MOD_*`)
 

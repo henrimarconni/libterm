@@ -234,6 +234,22 @@ static void lt__posix_parse_csi_tilde_key(const unsigned char *seq,
   }
 }
 
+/* termbox2 model: a standalone control byte (0x00-0x1F or 0x7F) is reported as
+ * a key code with ch == 0 (LT_KEY_CTRL_*, which share values with the named
+ * ENTER/TAB/BACKSPACE keys), not as a character. ESC (0x1B) is intercepted by
+ * the escape-sequence path before this is reached. Returns true if `b` was a
+ * control byte and the event was filled. */
+static bool lt__posix_ctrl_byte_event(unsigned char b, struct lt_event *ev) {
+  if (b >= 0x20 && b != 0x7F)
+    return false;
+
+  ev->type = LT_EVENT_KEY;
+  ev->mod = 0;
+  ev->key = (uint16_t)b;
+  ev->ch = 0;
+  return true;
+}
+
 static unsigned int lt__posix_parse_esc_seq(const unsigned char *seq,
                                             size_t seq_len,
                                             struct lt_event *ev) {
@@ -351,6 +367,9 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
         return lt__posix_parse_esc_seq(seq, seq_len, ev);
       }
+
+      if (lt__posix_ctrl_byte_event((unsigned char)ch, ev))
+        return LT_OK;
 
       unsigned char seq8[4] = {(unsigned char)ch, 0, 0, 0};
       int need = lt__utf8_char_length((char)seq8[0]);

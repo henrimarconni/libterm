@@ -92,6 +92,51 @@ extern "C" {
 #define LT_KEY_BACKSPACE2 0x7F
 #define LT_KEY_TAB 0x09
 
+/* ---- Ctrl+key codes (mirror termbox2) ----
+ * A standalone control byte is reported as one of these key codes (ch == 0).
+ * Several intentionally share a value with the named keys above: CTRL_H ==
+ * BACKSPACE (0x08), CTRL_I == TAB (0x09), CTRL_M == ENTER (0x0D),
+ * CTRL_LSQ_BRACKET == ESC (0x1B), CTRL_8 == BACKSPACE2 (0x7F). */
+#define LT_KEY_CTRL_TILDE 0x00
+#define LT_KEY_CTRL_2 0x00 /* clash with CTRL_TILDE */
+#define LT_KEY_CTRL_A 0x01
+#define LT_KEY_CTRL_B 0x02
+#define LT_KEY_CTRL_C 0x03
+#define LT_KEY_CTRL_D 0x04
+#define LT_KEY_CTRL_E 0x05
+#define LT_KEY_CTRL_F 0x06
+#define LT_KEY_CTRL_G 0x07
+#define LT_KEY_CTRL_H 0x08 /* clash with BACKSPACE */
+#define LT_KEY_CTRL_I 0x09 /* clash with TAB */
+#define LT_KEY_CTRL_J 0x0A
+#define LT_KEY_CTRL_K 0x0B
+#define LT_KEY_CTRL_L 0x0C
+#define LT_KEY_CTRL_M 0x0D /* clash with ENTER */
+#define LT_KEY_CTRL_N 0x0E
+#define LT_KEY_CTRL_O 0x0F
+#define LT_KEY_CTRL_P 0x10
+#define LT_KEY_CTRL_Q 0x11
+#define LT_KEY_CTRL_R 0x12
+#define LT_KEY_CTRL_S 0x13
+#define LT_KEY_CTRL_T 0x14
+#define LT_KEY_CTRL_U 0x15
+#define LT_KEY_CTRL_V 0x16
+#define LT_KEY_CTRL_W 0x17
+#define LT_KEY_CTRL_X 0x18
+#define LT_KEY_CTRL_Y 0x19
+#define LT_KEY_CTRL_Z 0x1A
+#define LT_KEY_CTRL_LSQ_BRACKET 0x1B /* clash with ESC */
+#define LT_KEY_CTRL_3 0x1B           /* clash with ESC */
+#define LT_KEY_CTRL_4 0x1C
+#define LT_KEY_CTRL_BACKSLASH 0x1C /* clash with CTRL_4 */
+#define LT_KEY_CTRL_5 0x1D
+#define LT_KEY_CTRL_RSQ_BRACKET 0x1D /* clash with CTRL_5 */
+#define LT_KEY_CTRL_6 0x1E
+#define LT_KEY_CTRL_7 0x1F
+#define LT_KEY_CTRL_SLASH 0x1F      /* clash with CTRL_7 */
+#define LT_KEY_CTRL_UNDERSCORE 0x1F /* clash with CTRL_7 */
+#define LT_KEY_CTRL_8 0x7F          /* clash with BACKSPACE2 */
+
 /* ---- modifiers ---- */
 #define LT_MOD_ALT 0x01
 #define LT_MOD_CTRL 0x02
