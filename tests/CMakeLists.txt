@@ -46,7 +46,12 @@ endif()
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
 # silent scalar fallback cannot pass the correctness contract test. Runs on the
 # host (bash + objdump on the per-backend object); not under the cross emulator.
-if(DEFINED LIBTERM_SIMD_RESOLVED)
+#
+# Host-only: the script assumes a Unix toolchain — POSIX `bash`, `objdump`, and
+# `<backend>.c.o` object naming. On Windows ctest resolves `bash` to the WSL
+# shim (which can't open the C:/ script path) and MinGW emits `<backend>.c.obj`,
+# so the assertion is neither runnable nor meaningful there. CI runs it on Linux.
+if(NOT WIN32 AND DEFINED LIBTERM_SIMD_RESOLVED)
     add_test(
         NAME test_simd_emitted
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
