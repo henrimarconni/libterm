@@ -68,4 +68,11 @@ int lt__utf8_char_length(char c);
 int lt__utf8_decode(const char *s, size_t len, lt_uchar *out);
 int lt__utf8_encode(lt_uchar ch, char out[4]);
 
+/* ---- SGR / run emission (shared/sgr.c) ----
+ * Platform-independent VT byte construction; calls lt__plat_reserve/commit
+ * (platform.h) to reach the per-platform output buffer. */
+int lt__write_uint(char *buf, int v); /* int -> decimal ASCII; returns digits */
+int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs);
+int lt__render_run(const struct lt_cell *cells, int count);
+
 #endif /* LIBTERM_INTERNAL_H */

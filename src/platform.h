@@ -31,7 +31,13 @@ int lt__plat_move_cursor(int x, int y);
 int lt__plat_hide_cursor(void);
 int lt__plat_show_cursor(void);
 int lt__plat_render_cell(int x, int y, const struct lt_cell *cell);
-int lt__plat_render_run(const struct lt_cell *cells, int count);
+
+/* Reserve `max` contiguous bytes in the platform output buffer (flushing first
+ * if needed) and return a writable pointer, or NULL if `max` exceeds capacity
+ * or a flush failed. After writing `actual` (<= max) bytes, call commit. Shared
+ * SGR/run emission (src/shared/sgr.c) fills the buffer through this pair. */
+char *lt__plat_reserve(size_t max);
+void lt__plat_commit(size_t actual);
 
 /* ---- input ----
  * lt__plat_read_event: blocks up to timeout_ms (-1 = wait forever, 0 =
