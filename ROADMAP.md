@@ -201,7 +201,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | ASCII char keys via `lt_poll_event` / `lt_peek_event` | [~] UTF-8 assembly path now active with `U+FFFD` fallback; still needs broader parity validation | [x] disambiguated via `KEY_EVENT_RECORD` |
 | Named keys (F1–F12, arrows, Home/End/PgUp/PgDn, Ins/Del) | [x] common xterm CSI/SS3 coverage (terminal-dependent beyond that set) | [x] full set via `plat_keys.c` |
 | Modifier bits in `ev->mod` | [~] CSI modifier suffixes mapped for POSIX escape-key families; coverage is not yet universal | [x] from `dwControlKeyState` |
-| UTF-8 input round-trip (BMP + supplementary) | [~] multi-byte assembly + strict decode path active in POSIX input parser with `U+FFFD` fallback; needs wider terminal parity checks | [x] surrogate pairs combined before emit; latch cleared on every non-completing return path |
+| UTF-8 input round-trip (BMP + supplementary) | [x] multi-byte assembly + strict decode with `U+FFFD` fallback; malformed sequences now **resync** (a non-continuation byte after a bad lead is replayed as its own event, not swallowed). End-to-end pty test `tests/test_posix_input_utf8.c` + decode boundary tests in `tests/test_utf8.c` | [x] surrogate pairs combined before emit; latch cleared on every non-completing return path |
 | UTF-8 output round-trip in render path | [x] `lt__utf8_encode` path active | [x] `lt__utf8_encode` writes 1–4 bytes |
 | `LT_EVENT_RESIZE` delivered exactly once per visible-size change | [~] SIGWINCH/self-pipe enabled; semantics still under parity validation | [x] `WINDOW_BUFFER_SIZE_EVENT` filtered for spurious events |
 | Diff-based `lt_present` (skip unchanged cells) | [x] shared path | [x] shared path |
@@ -221,7 +221,7 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 
 1. ~~**Windows SGR/color emission.**~~ **Resolved.** SGR emission was extracted into the shared `src/shared/sgr.c` (`lt__emit_sgr` / `lt__render_run`); both platforms now run it. Colors were visually confirmed in Windows Terminal (bench SGR workloads, real `WriteFile` output) and are guarded by an automated Windows byte test (`tests/test_win_sgr_output.c`) alongside the POSIX pty test.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
-3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
+3. ~~**POSIX UTF-8 input semantics need parity hardening.**~~ **Resolved.** Multi-byte assembly + strict decode with `U+FFFD` fallback now resync correctly (no byte-swallowing on malformed input), covered end-to-end by a pty test (`tests/test_posix_input_utf8.c`) and decode boundary tests. Remaining input work is general cross-terminal escape-sequence coverage (poll/peek), not UTF-8.
 4. **Public API surface still trails termbox2.** `lt_init_file` / `lt_init_rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared. (`lt_init_fd` is now declared and implemented on POSIX.)
 5. **Output-mode parity now shares one code path.** Both platforms consume `lt_set_output_mode` through the shared `lt__emit_sgr`, so the previous POSIX-only / Windows-stores-only skew is gone; remaining work is the Windows verification noted in blocker #1.
 

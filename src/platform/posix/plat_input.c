@@ -9,6 +9,23 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+/* Bytes pending re-delivery as standalone events, replayed one at a time on the
+ * following reads. Two producers stash here: LT_INPUT_ESC (an unrecognized
+ * ESC-prefixed combo emits LT_KEY_ESC, then the trailing byte) and the UTF-8
+ * assembler (a stray non-continuation byte, instead of swallowing it). The
+ * consumer, lt__posix_pending_pop, sits lower down next to where it is drained. */
+static unsigned char lt__posix_pending[8];
+static size_t lt__posix_pending_len = 0;
+static size_t lt__posix_pending_pos = 0;
+
+static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
+  if (n > sizeof(lt__posix_pending))
+    n = sizeof(lt__posix_pending);
+  memcpy(lt__posix_pending, bytes, n);
+  lt__posix_pending_len = n;
+  lt__posix_pending_pos = 0;
+}
+
 static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
                                        size_t want) {
   size_t len = have;
@@ -32,6 +49,15 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
     ssize_t n = read(ttyfd, &buf[len], 1);
     if (n != 1)
       break;
+
+    /* A byte that isn't a UTF-8 continuation (10xxxxxx) does not belong to this
+     * sequence. Stash it for re-delivery as its own event and stop, so the
+     * partial sequence decodes to U+FFFD without swallowing the next keypress. */
+    if ((buf[len] & 0xC0) != 0x80) {
+      unsigned char stray = buf[len];
+      lt__posix_pending_push(&stray, 1);
+      break;
+    }
 
     len++;
   }
@@ -248,21 +274,6 @@ static bool lt__posix_ctrl_byte_event(unsigned char b, struct lt_event *ev) {
   ev->key = (uint16_t)b;
   ev->ch = 0;
   return true;
-}
-
-/* Bytes pending re-delivery as standalone events. Used by LT_INPUT_ESC: an
- * unrecognized ESC-prefixed combo emits LT_KEY_ESC first, then the trailing
- * byte(s) are replayed here one event at a time on the following reads. */
-static unsigned char lt__posix_pending[8];
-static size_t lt__posix_pending_len = 0;
-static size_t lt__posix_pending_pos = 0;
-
-static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
-  if (n > sizeof(lt__posix_pending))
-    n = sizeof(lt__posix_pending);
-  memcpy(lt__posix_pending, bytes, n);
-  lt__posix_pending_len = n;
-  lt__posix_pending_pos = 0;
 }
 
 /* Fill `ev` from the next pending byte. Returns true while bytes remain. Alt
