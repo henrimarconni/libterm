@@ -245,6 +245,64 @@ static void run_ctrl_byte_keys(void) {
   expect_not_ctrl_byte(0x7E); /* '~' */
 }
 
+static void run_input_mode_alt(void) {
+  /* LT_INPUT_ALT: Alt+<key> is a single event with LT_MOD_ALT. */
+  lt__g.input_mode = LT_INPUT_ALT;
+
+  /* Alt+a -> ch='a', mod=ALT (printable). */
+  {
+    struct lt_event ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.type = LT_EVENT_KEY;
+    const unsigned char s[] = {'\x1b', 'a'};
+    assert(lt__posix_handle_alt_combo(s, sizeof(s), &ev) == LT_OK);
+    assert(ev.key == 0);
+    assert(ev.ch == 'a');
+    assert(ev.mod == LT_MOD_ALT);
+  }
+
+  /* Alt+Ctrl+a (ESC 0x01) -> key=CTRL_A, ch=0, mod=ALT (control byte). */
+  {
+    struct lt_event ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.type = LT_EVENT_KEY;
+    const unsigned char s[] = {'\x1b', 0x01};
+    assert(lt__posix_handle_alt_combo(s, sizeof(s), &ev) == LT_OK);
+    assert(ev.key == LT_KEY_CTRL_A);
+    assert(ev.ch == 0);
+    assert(ev.mod == LT_MOD_ALT);
+  }
+}
+
+static void run_input_mode_esc(void) {
+  /* LT_INPUT_ESC: Alt+<key> -> LT_KEY_ESC now, then the byte replayed as the
+   * next event (termbox2's two-event default). */
+  lt__g.input_mode = LT_INPUT_ESC;
+  lt__posix_pending_len = 0;
+  lt__posix_pending_pos = 0;
+
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  ev.type = LT_EVENT_KEY;
+  const unsigned char s[] = {'\x1b', 'a'};
+  assert(lt__posix_handle_alt_combo(s, sizeof(s), &ev) == LT_OK);
+  assert(ev.key == LT_KEY_ESC);
+  assert(ev.ch == 0);
+  assert(ev.mod == 0);
+
+  /* The 'a' is now pending — pop it as the following event. */
+  struct lt_event ev2;
+  memset(&ev2, 0, sizeof(ev2));
+  assert(lt__posix_pending_pop(&ev2));
+  assert(ev2.ch == 'a');
+  assert(ev2.key == 0);
+
+  /* Buffer is drained afterwards. */
+  struct lt_event ev3;
+  memset(&ev3, 0, sizeof(ev3));
+  assert(!lt__posix_pending_pop(&ev3));
+}
+
 int main(void) {
   run_letter_mod_matrix();
   run_bare_letter_keys();
@@ -254,5 +312,7 @@ int main(void) {
   run_bare_esc();
   run_negative_cases();
   run_ctrl_byte_keys();
+  run_input_mode_alt();
+  run_input_mode_esc();
   return 0;
 }

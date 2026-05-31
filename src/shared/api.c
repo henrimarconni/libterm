@@ -24,6 +24,9 @@ static int lt__finish_init(void) {
   lt__g.cur_fg = 0xFFFFFFFF;
   lt__g.cur_bg = 0xFFFFFFFF;
   lt__g.cur_attrs = 0xFFFFFFFF;
+  /* termbox2 default: lone ESC is its own key, Alt-combos are reported as a
+   * separate ESC followed by the key (see lt_set_input_mode / LT_INPUT_ALT). */
+  lt__g.input_mode = LT_INPUT_ESC;
   lt__g.initialized = 1;
   return LT_OK;
 }
