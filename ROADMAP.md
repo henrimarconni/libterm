@@ -45,7 +45,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX now handles arrows, Home/End, Insert/Delete, PgUp/PgDn, F1–F12, CSI modifier forms, SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback; parity edge-cases across terminals still remain |
 | `tb_peek_event` | `lt_peek_event` | [~] | [x] | Same caveats as `lt_poll_event` |
 | `tb_get_fds` | `lt_get_fds` | [ ] | [—] | Not declared |
-| `tb_set_input_mode` | `lt_set_input_mode` | [~] | [~] | Stores the flag in `lt__g`; nothing in the input path reads it yet |
+| `tb_set_input_mode` | `lt_set_input_mode` | [x] | [x] | `lt_init` defaults to `LT_INPUT_ESC`. POSIX honors the flag for Alt-combos (`ESC <byte>`): `LT_INPUT_ALT` → one event with `LT_MOD_ALT`; `LT_INPUT_ESC` → `LT_KEY_ESC` then the byte replayed (termbox2's two-event default). Windows always reports explicit modifier state (`MOD_ALT` from `dwControlKeyState`), i.e. always `LT_INPUT_ALT`-style — the ESC-prefix distinction is a POSIX-terminal concern. `LT_INPUT_MOUSE` is accepted but inert until mouse exists. POSIX behavior unit-tested in `tests/test_posix_input_parse.c` |
 
 ### Output mode
 
@@ -160,7 +160,7 @@ Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
-Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. `lt_set_input_mode` records the value but no input path branches on it yet.
+Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. Consumed: `lt_init` defaults to `LT_INPUT_ESC`; the POSIX input path branches on `LT_INPUT_ESC` vs `LT_INPUT_ALT` for Alt-combos (Windows uses explicit modifier state, always `LT_INPUT_ALT`-style). `LT_INPUT_MOUSE` is accepted but inert pending mouse support.
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 

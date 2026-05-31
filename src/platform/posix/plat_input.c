@@ -250,6 +250,66 @@ static bool lt__posix_ctrl_byte_event(unsigned char b, struct lt_event *ev) {
   return true;
 }
 
+/* Bytes pending re-delivery as standalone events. Used by LT_INPUT_ESC: an
+ * unrecognized ESC-prefixed combo emits LT_KEY_ESC first, then the trailing
+ * byte(s) are replayed here one event at a time on the following reads. */
+static unsigned char lt__posix_pending[8];
+static size_t lt__posix_pending_len = 0;
+static size_t lt__posix_pending_pos = 0;
+
+static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
+  if (n > sizeof(lt__posix_pending))
+    n = sizeof(lt__posix_pending);
+  memcpy(lt__posix_pending, bytes, n);
+  lt__posix_pending_len = n;
+  lt__posix_pending_pos = 0;
+}
+
+/* Fill `ev` from the next pending byte. Returns true while bytes remain. Alt
+ * combos are ASCII in practice, so a pending byte is either a control byte
+ * (-> key code) or a single character (-> ch). */
+static bool lt__posix_pending_pop(struct lt_event *ev) {
+  if (lt__posix_pending_pos >= lt__posix_pending_len)
+    return false;
+
+  unsigned char b = lt__posix_pending[lt__posix_pending_pos++];
+  if (lt__posix_pending_pos >= lt__posix_pending_len) {
+    lt__posix_pending_len = 0;
+    lt__posix_pending_pos = 0;
+  }
+
+  ev->type = LT_EVENT_KEY;
+  if (!lt__posix_ctrl_byte_event(b, ev))
+    ev->ch = (lt_uchar)b;
+  return true;
+}
+
+/* Handle an ESC-prefixed sequence that no recognized-key branch claimed — i.e.
+ * Alt+<key>, which a terminal encodes as ESC then the key byte(s). Behavior is
+ * governed by lt_set_input_mode:
+ *   LT_INPUT_ALT: one event, the key with LT_MOD_ALT set.
+ *   LT_INPUT_ESC: emit LT_KEY_ESC now; replay the trailing byte(s) as the next
+ *                 event(s) (termbox2's two-event default). */
+static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
+                                      struct lt_event *ev) {
+  if (lt__g.input_mode == LT_INPUT_ALT) {
+    unsigned char b = seq[1];
+    if (!lt__posix_ctrl_byte_event(b, ev))
+      ev->ch = (lt_uchar)b;
+    ev->mod |= LT_MOD_ALT;
+    return LT_OK;
+  }
+
+  /* LT_INPUT_ESC (default). */
+  ev->type = LT_EVENT_KEY;
+  ev->mod = 0;
+  ev->key = LT_KEY_ESC;
+  ev->ch = 0;
+  if (seq_len > 1)
+    lt__posix_pending_push(seq + 1, seq_len - 1);
+  return LT_OK;
+}
+
 static unsigned int lt__posix_parse_esc_seq(const unsigned char *seq,
                                             size_t seq_len,
                                             struct lt_event *ev) {
@@ -296,6 +356,10 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
   while (true) {
     memset(ev, 0, sizeof(*ev));
+
+    /* Replay any bytes stashed by an LT_INPUT_ESC Alt-combo before blocking. */
+    if (lt__posix_pending_pop(ev))
+      return LT_OK;
 
     fd_set rfds;
     FD_ZERO(&rfds);
@@ -365,7 +429,16 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
         ev->mod = 0;
         ev->key = 0;
 
-        return lt__posix_parse_esc_seq(seq, seq_len, ev);
+        lt__posix_parse_esc_seq(seq, seq_len, ev);
+
+        /* Unrecognized ESC + byte that doesn't introduce a CSI/SS3 sequence is
+         * an Alt-combo; dispatch it by input mode. Recognized keys, characters,
+         * and bare ESC pass through unchanged. */
+        if (ev->key == 0 && ev->ch == 0 && seq_len >= 2 && seq[1] != '[' &&
+            seq[1] != 'O')
+          return lt__posix_handle_alt_combo(seq, seq_len, ev);
+
+        return LT_OK;
       }
 
       if (lt__posix_ctrl_byte_event((unsigned char)ch, ev))
