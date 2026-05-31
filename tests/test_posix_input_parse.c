@@ -206,6 +206,45 @@ static void run_negative_cases(void) {
   }
 }
 
+static void expect_ctrl_byte(unsigned char b, uint16_t want_key) {
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  bool consumed = lt__posix_ctrl_byte_event(b, &ev);
+  assert(consumed);
+  assert(ev.type == LT_EVENT_KEY);
+  assert(ev.key == want_key);
+  assert(ev.ch == 0);
+  assert(ev.mod == 0);
+}
+
+static void expect_not_ctrl_byte(unsigned char b) {
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  assert(!lt__posix_ctrl_byte_event(b, &ev));
+}
+
+static void run_ctrl_byte_keys(void) {
+  /* Ctrl+letter control bytes map to LT_KEY_CTRL_* (== the byte), ch == 0. */
+  expect_ctrl_byte(0x01, LT_KEY_CTRL_A);
+  expect_ctrl_byte(0x03, LT_KEY_CTRL_C);
+  expect_ctrl_byte(0x1A, LT_KEY_CTRL_Z);
+
+  /* Named keys that share control-byte values resolve to the named code. */
+  expect_ctrl_byte(0x08, LT_KEY_BACKSPACE); /* == CTRL_H */
+  expect_ctrl_byte(0x09, LT_KEY_TAB);       /* == CTRL_I */
+  expect_ctrl_byte(0x0D, LT_KEY_ENTER);     /* == CTRL_M */
+
+  /* Upper control range and DEL. */
+  expect_ctrl_byte(0x1C, LT_KEY_CTRL_4);
+  expect_ctrl_byte(0x1F, LT_KEY_CTRL_7);
+  expect_ctrl_byte(0x7F, LT_KEY_BACKSPACE2); /* == CTRL_8 */
+
+  /* Printable bytes are NOT control bytes — they go through the UTF-8 path. */
+  expect_not_ctrl_byte(0x20); /* space */
+  expect_not_ctrl_byte('A');
+  expect_not_ctrl_byte(0x7E); /* '~' */
+}
+
 int main(void) {
   run_letter_mod_matrix();
   run_bare_letter_keys();
@@ -214,5 +253,6 @@ int main(void) {
   run_tilde_with_mod();
   run_bare_esc();
   run_negative_cases();
+  run_ctrl_byte_keys();
   return 0;
 }

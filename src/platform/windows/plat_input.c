@@ -97,6 +97,19 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     }
 
     WCHAR ch16 = kev.uChar.UnicodeChar;
+
+    /* termbox2 model: a control character that isn't a named key (Ctrl+letter
+     * etc.) is reported as a key code with ch == 0 and no separate modifier,
+     * matching POSIX. Named keys handled above keep their dwControlKeyState
+     * modifiers. */
+    if (ch16 != 0 && (ch16 < 0x20 || ch16 == 0x7F)) {
+      lt__win_pending_high = 0;
+      ev->mod = 0;
+      ev->key = (uint16_t)ch16;
+      ev->ch = 0;
+      return LT_OK;
+    }
+
     if (ch16 >= 0xD800 && ch16 <= 0xDBFF) {
       lt__win_pending_high = ch16;
       continue;
