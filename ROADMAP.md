@@ -28,7 +28,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_height` | `lt_height` | [x] | [x] | Reads cached `lt__g.height` |
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
 | `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | Returns `LT_ERR_NOT_INIT` before `lt_init` (consistent with `lt_clear`/`lt_present`/`lt_set_cell`) |
-| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. POSIX emits mode-aware SGR for all five output modes — normal/256/216/grayscale/truecolor — with a `LT_HI_BLACK` sentinel separating terminal-default from real black (output bytes asserted in `tests/test_posix_sgr_output.c`); Windows render path remains glyph-focused |
+| `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. The run/SGR emission now lives in **shared** `src/shared/sgr.c` (`lt__render_run` → `lt__emit_sgr`), so both platforms emit the same mode-aware SGR for all five output modes — normal/256/216/grayscale/truecolor — with a `LT_HI_BLACK` sentinel separating terminal-default from real black. Output bytes asserted on POSIX via pty (`tests/test_posix_sgr_output.c`); Windows uses the identical shared code (real-terminal visual confirmation pending, no Windows-native byte test yet) |
 | `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
 | `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
 | `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
@@ -51,7 +51,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_set_output_mode` | `lt_set_output_mode` | [x] | [~] | POSIX SGR emission now branches on output mode; Windows still stores-only |
+| `tb_set_output_mode` | `lt_set_output_mode` | [x] | [x] | SGR emission branches on output mode through the shared `lt__emit_sgr` (`src/shared/sgr.c`), so Windows is no longer stores-only — it consumes the mode via the same path as POSIX (Windows real-terminal confirmation pending) |
 
 ### Print / send helpers
 
@@ -152,11 +152,11 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
-Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`, plus `LT_RGB(r,g,b)` (24-bit pack) and the `LT_HI_BLACK` sentinel. Emitted on POSIX via mode-aware SGR in `lt__plat_emit_sgr` — named (NORMAL), 8-bit palette index (256/216/grayscale), and 24-bit RGB (TRUECOLOR), with `LT_HI_BLACK` distinguishing the terminal default from real black; emitted bytes asserted in `tests/test_posix_sgr_output.c`. Windows still pending.
+Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`, plus `LT_RGB(r,g,b)` (24-bit pack) and the `LT_HI_BLACK` sentinel. Emitted on **both platforms** via mode-aware SGR in the shared `lt__emit_sgr` (`src/shared/sgr.c`) — named (NORMAL), 8-bit palette index (256/216/grayscale), and 24-bit RGB (TRUECOLOR), with `LT_HI_BLACK` distinguishing the terminal default from real black. Emitted bytes asserted on POSIX in `tests/test_posix_sgr_output.c`; Windows runs the same shared code (real-terminal/byte verification pending).
 
 ### Attributes (`TB_BOLD/UNDERLINE/…` → `LT_BOLD/UNDERLINE/…`)
 
-Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE` (bits 24-30, above the 24-bit color field). Emitted on POSIX SGR path; Windows still pending.
+Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_DIM`, `LT_STRIKE` (bits 24-30, above the 24-bit color field). Emitted on **both platforms** via the shared SGR path (`lt__emit_sgr`, `src/shared/sgr.c`); POSIX byte-tested, Windows confirmation pending.
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
@@ -164,7 +164,7 @@ Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. 
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 
-Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. All emit correct SGR on the POSIX path — 24-bit truecolor and 8-bit palette indices, byte-tested in `tests/test_posix_sgr_output.c`; Windows stores-only.
+Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_216`, `LT_OUTPUT_GRAYSCALE`, `LT_OUTPUT_TRUECOLOR`. All emit correct SGR through the shared `lt__emit_sgr` (`src/shared/sgr.c`) — 24-bit truecolor and 8-bit palette indices — consumed identically on both platforms; byte-tested on POSIX in `tests/test_posix_sgr_output.c`, Windows confirmation pending.
 
 ### Function-hook ids (`TB_FUNC_*` → `LT_FUNC_*`)
 
@@ -209,7 +209,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | Alt-screen UX (prior scrollback preserved on exit) | [x] `\x1b[?1049h` / `\x1b[?1049l` | [x] `\x1b[?1049h` on init / `\x1b[?1049l` on shutdown |
 | Hand-rolled int-to-decimal in render path (no `snprintf`) | [x] | [x] `lt__plat_move_cursor` writes digits directly |
 | Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
-| SGR / color emission | [x] | [ ] |
+| SGR / color emission | [x] byte-tested via pty (`tests/test_posix_sgr_output.c`) | [x] shared `lt__emit_sgr` (`src/shared/sgr.c`); colors visually confirmed in Windows Terminal via the bench SGR workloads (`bench/bench_present.c`, real `WriteFile` output) + automated byte test (`tests/test_win_sgr_output.c`) |
 | Runtime color-depth detection (`lt_detect_color_depth`) | [x] `$COLORTERM`/`$TERM` → `LT_OUTPUT_*` ceiling; hermetic `setenv` test (`tests/test_detect_color_depth.c`), wired into `examples/truecolor.c` | [x] same standard-C path (test harness POSIX-only) |
 | Mouse events | [ ] | [ ] |
 
@@ -219,11 +219,11 @@ A feature is listed here only if it has been observed working on a real terminal
 
 These are the things that, if fixed, would move the largest number of `[~]` rows above to `[x]`.
 
-1. **Windows SGR/color emission is still missing.** POSIX emits mode-aware SGR, but Windows renderer still emits glyph bytes without fg/bg/attribute SGR state.
+1. ~~**Windows SGR/color emission.**~~ **Resolved.** SGR emission was extracted into the shared `src/shared/sgr.c` (`lt__emit_sgr` / `lt__render_run`); both platforms now run it. Colors were visually confirmed in Windows Terminal (bench SGR workloads, real `WriteFile` output) and are guarded by an automated Windows byte test (`tests/test_win_sgr_output.c`) alongside the POSIX pty test.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are now mapped for escape-key families, but behavior is not yet universal across all key paths and terminals.
 3. **POSIX UTF-8 input semantics need parity hardening.** Multi-byte assembly and strict decode are active with `U+FFFD` fallback, but cross-terminal behavior still needs broader validation.
 4. **Public API surface still trails termbox2.** `lt_init_file` / `lt_init_rwfd`, `lt_get_fds`, print/send helpers, and several introspection helpers remain undeclared. (`lt_init_fd` is now declared and implemented on POSIX.)
-5. **Output-mode parity remains platform-skewed.** POSIX emits correct SGR for all modes incl. 24-bit truecolor and the `LT_HI_BLACK` sentinel (byte-tested); Windows still has stores-only output-mode behavior.
+5. **Output-mode parity now shares one code path.** Both platforms consume `lt_set_output_mode` through the shared `lt__emit_sgr`, so the previous POSIX-only / Windows-stores-only skew is gone; remaining work is the Windows verification noted in blocker #1.
 
 ---
 
@@ -242,6 +242,6 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 3. POSIX and Windows produce identical `lt_event` sequences for the same physical key, mouse, and resize input.
 4. `lt_present` is diff-based and emits zero bytes when no cell has changed.
 5. UTF-8 input and output round-trip correctly for 1–4-byte sequences and grapheme clusters.
-6. All four output color modes render correctly on Windows Terminal, xterm, tmux, macOS Terminal, and the Linux console. POSIX SGR byte-correctness for all modes is implemented and tested (`tests/test_posix_sgr_output.c`); cross-terminal visual confirmation and the Windows SGR path remain.
+6. All four output color modes render correctly on Windows Terminal, xterm, tmux, macOS Terminal, and the Linux console. SGR emission is implemented as one shared code path (`src/shared/sgr.c`) consumed by both platforms, with POSIX byte-correctness tested (`tests/test_posix_sgr_output.c`); cross-terminal visual confirmation and an automated Windows byte test remain.
 7. Sanitizer CI is green (Linux gcc + clang, Windows MSVC); fuzzer runs an hour without crashes; valgrind reports no leaks.
 8. `compat/termbox2.h` drop-in layer exists and a non-trivial example (small text editor) builds against it.

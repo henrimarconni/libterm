@@ -112,7 +112,7 @@ int lt_present(void) {
       }
 
       /* emit the entire run in one block */
-      rc = lt__plat_render_run(&lt__g.back[idx], run_len);
+      rc = lt__render_run(&lt__g.back[idx], run_len);
       if (rc != LT_OK) {
         return lt__present_abort(rc);
       }
