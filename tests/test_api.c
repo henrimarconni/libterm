@@ -85,6 +85,34 @@ int main(void) {
   assert(lt_peek_event(&ev, 0) == LT_ERR_NOT_INIT);
   assert(lt_shutdown() == LT_ERR_NOT_INIT);
 
+  /* The functions added after the original API must honor the same pre-init
+   * guard (their headers document "LT_ERR_NOT_INIT before lt_init"). These were
+   * previously unasserted. */
+  {
+    struct lt_cell cell;
+    const lt_uchar cl[] = {'e', 0x0301};
+    assert(lt_get_cell(0, 0, &cell) == LT_ERR_NOT_INIT);
+    assert(lt_print(0, 0, LT_DEFAULT, LT_DEFAULT, "x") == LT_ERR_NOT_INIT);
+    assert(lt_print_ex(0, 0, LT_DEFAULT, LT_DEFAULT, NULL, "x") ==
+           LT_ERR_NOT_INIT);
+    assert(lt_printf(0, 0, LT_DEFAULT, LT_DEFAULT, "%d", 1) == LT_ERR_NOT_INIT);
+    assert(lt_printf_ex(0, 0, LT_DEFAULT, LT_DEFAULT, NULL, "%d", 1) ==
+           LT_ERR_NOT_INIT);
+    assert(lt_send("x", 1) == LT_ERR_NOT_INIT);
+    assert(lt_sendf("%d", 1) == LT_ERR_NOT_INIT);
+    assert(lt_set_cell_ex(0, 0, cl, 2, LT_DEFAULT, LT_DEFAULT) ==
+           LT_ERR_NOT_INIT);
+    assert(lt_extend_cell(0, 0, 0x0301) == LT_ERR_NOT_INIT);
+    assert(lt_invalidate() == LT_ERR_NOT_INIT);
+    assert(lt_get_fds(NULL, NULL) == LT_ERR_NOT_INIT);
+
+    /* Arg-validation must not depend on init order: a NULL/empty arg is still
+     * rejected, and the documented arg error (LT_ERR) is independent of the
+     * not-init guard ordering. lt_get_cell guards init first, so NULL out still
+     * reads as NOT_INIT here — that's the documented precedence. */
+    assert(lt_print(0, 0, LT_DEFAULT, LT_DEFAULT, NULL) == LT_ERR_NOT_INIT);
+  }
+
   /* mode getters/setters are stateful API and should roundtrip */
   assert(lt_set_input_mode(LT_INPUT_CURRENT) == 0);
   assert(lt_set_input_mode(LT_INPUT_ESC) == LT_INPUT_ESC);
