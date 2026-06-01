@@ -231,6 +231,36 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 
 ---
 
+## Planned enhancements (beyond termbox2 parity)
+
+Features that go past the termbox2 API surface but are wanted for libterm. Not required for v1.0 (which is termbox2 parity), tracked here so the design intent isn't lost.
+
+### Kitty keyboard protocol (progressive enhancement)
+
+**Problem.** Legacy terminal input is lossy for modifiers, and it is the *terminal* encoding — not libterm — that drops the information:
+
+- A **bare modifier** press (Ctrl / Shift / Alt alone) sends **zero bytes**, so it can never be reported.
+- **Shift+letter** is folded into an uppercase character: the terminal sends `'A'` with no modifier bit (verified — `lt_peek_event` returns `key=0x00 ch=0x41 mod=0x00`).
+- **Ctrl+letter** collapses to a control byte (`Ctrl+S` → `0x13`), indistinguishable from `Tab`/`Enter`/`Backspace` for `Ctrl+I/M/H`.
+- There are no key **release** or **repeat** events.
+
+Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `Shift+Up` → `mod=LT_MOD_SHIFT`, `Ctrl+Up` → `mod=LT_MOD_CTRL`, `Alt+x` → `mod=LT_MOD_ALT` (the last via `LT_INPUT_ALT`). The `LT_MOD_*` rows for POSIX are `[ ]` (see Modifiers table) precisely because letters can't carry them in legacy mode.
+
+**Solution.** Implement the [kitty keyboard protocol](external/kitty/docs/keyboard-protocol.rst) progressive enhancement (a superset of fixterms / `CSI u`). Supporting terminals then report every modifier — including bare presses, releases, and Shift+letter — as unambiguous `CSI … u` escape codes.
+
+**Work involved:**
+- **Negotiation.** On `lt_init` (POSIX), push the desired flags with `CSI > <flags> u` and pop on `lt_shutdown` with `CSI < u`; optionally query support first with `CSI ? u`. Fall back silently to the current legacy parsing if the terminal doesn't respond — no regression on non-supporting terminals.
+- **Flags.** `0x1` disambiguate escape codes, `0x2` report event types (press/repeat/release), `0x4` report alternate keys, `0x8` report all keys as escape codes, `0x10` report associated text. A sensible default is `0x1 | 0x2 | 0x8`.
+- **Parsing.** The `CSI <cp>;<mods> u` report parser already exists (`tests/test_posix_input_parse.c`); extend it to the full form `CSI <cp>[:alt];<mods>[:event-type];<text> u` — decode the event-type sub-parameter (1 press / 2 repeat / 3 release) and the associated-text field.
+- **API surface (new).** Decide how to surface key **release/repeat** and **bare modifier** events: either a new event-action field on `struct lt_event` (e.g. `press`/`repeat`/`release`) or a distinct event type. Either is a deliberate addition beyond termbox2 — note it as a libterm divergence when added.
+- **Input-mode flag.** Likely a new `LT_INPUT_*` bit (e.g. `LT_INPUT_KITTY`) to opt in, keeping the legacy two-event Esc/Alt model the default for drop-in termbox2 compatibility.
+
+**Terminals:** kitty, foot, ghostty, WezTerm, recent xterm; Alacritty partial. The older `xterm` `modifyOtherKeys` (`CSI > 4 ; 2 m`) is a partial alternative (more combos, but still no bare-modifier or release events) and could be a secondary fallback.
+
+**Payoff.** Moves the POSIX `LT_MOD_ALT/CTRL/SHIFT` rows toward `[x]` for *all* keys (not just CSI families), enables bare-modifier and Shift+letter detection, adds key-release/repeat, and resolves the "inherently lossy" caveat in Known blocker #2. `examples/kbd.c` (the on-screen keyboard + live event inspector) is the natural development harness — once libterm emits the bits, its inspector and modifier caps light up for every combination.
+
+---
+
 ## Out of scope for libterm (intentional divergence from termbox2)
 
 - Header-only distribution. libterm ships as a compiled library by design; `compat/termbox2.h` (planned) will provide the drop-in macro layer.
