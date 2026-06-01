@@ -83,6 +83,11 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   return LT_ERR_INIT_OPEN; /* fd-based init is POSIX-only */
 }
 
+int lt__plat_init_file(const char *path) {
+  (void)path;
+  return LT_ERR_INIT_OPEN; /* path/fd-based init is POSIX-only */
+}
+
 int lt__plat_shutdown(void) {
 #if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
   return LT_OK;

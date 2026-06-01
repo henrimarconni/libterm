@@ -18,6 +18,9 @@ int lt__plat_init(void);
  * non-zero means the platform closes the fd on shutdown; zero means the caller
  * retains ownership. */
 int lt__plat_init_fd(int ttyfd, int owned);
+/* Open `path` as a tty and initialize against it; the platform owns and closes
+ * the fd. Returns LT_ERR_INIT_OPEN if it can't be opened. */
+int lt__plat_init_file(const char *path);
 int lt__plat_shutdown(void);
 
 /* ---- terminal size ---- */

@@ -49,6 +49,17 @@ int lt_init(void) {
   return lt__finish_init();
 }
 
+int lt_init_file(const char *path) {
+  if (lt__g.initialized)
+    return LT_ERR_INIT_ALREADY;
+  if (!path)
+    return LT_ERR;
+  int rc = lt__plat_init_file(path);
+  if (rc != LT_OK)
+    return rc;
+  return lt__finish_init();
+}
+
 int lt_shutdown(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;

@@ -15,9 +15,9 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
 | `tb_init` | `lt_init` | [x] | [x] | POSIX now opens `/dev/tty`, enters raw mode, enters alt-screen, and initializes SIGWINCH self-pipe. Windows enters raw mode + alt-screen (`\x1b[?1049h`) so prior scrollback is preserved across the libterm session |
-| `tb_init_file` | `lt_init_file` | [ ] | [ ] | Not declared in `libterm.h` |
+| `tb_init_file` | `lt_init_file` | [x] | [—] | Opens `path` (`O_RDWR`) and inits against it; libterm owns and closes the fd on shutdown (unlike `lt_init_fd`). `LT_ERR_INIT_OPEN` if it can't open or isn't a tty (`lt_last_errno` carries the cause). Shares the POSIX open+own path with `lt__plat_init` (`/dev/tty`). Tested against a real pty device path in `tests/test_init_file.c`. Windows: returns `LT_ERR_INIT_OPEN` (path/fd init is POSIX-only) |
 | `tb_init_fd` | `lt_init_fd` | [x] | [—] | Inits against a caller-supplied tty fd (`isatty`-validated; **not** closed on shutdown — caller retains ownership). Mirrors termbox2's `tb_init_fd`; `lt_init` now delegates to it via shared `lt__finish_init`. Windows: stub returns `LT_ERR_INIT_OPEN` (POSIX-only). Exercised headlessly by `tests/test_pty_lifecycle.c` |
-| `tb_init_rwfd` | `lt_init_rwfd` | [ ] | [—] | Not declared |
+| `tb_init_rwfd` | `lt_init_rwfd` | [—] | [—] | **Intentional divergence.** libterm's POSIX layer is single-fd by design (input reads and output writes share one tty fd). Split read/write fds would thread a second fd through init/output/input for a use case (terminal over two different fds) that doesn't arise in practice. Use `lt_init_fd` / `lt_init_file` |
 | `tb_shutdown` | `lt_shutdown` | [x] | [x] | POSIX restores cursor visibility, leaves alt-screen, restores saved termios, tears down resize pipe/signal state, and closes tty fd. Windows leaves alt-screen (`\x1b[?1049l`) after cursor-show + flush, then restores both console modes |
 
 ### Screen geometry & rendering
@@ -63,7 +63,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_printf_ex` | `lt_printf_ex` | [x] | [x] | printf variant of `lt_print_ex`: `out_w` receives the widest line's column count. Shares a `vsnprintf` core with `lt_printf` (`src/shared/cell.c`); tested in `tests/test_print.c` |
 | `tb_send` | `lt_send` | [x] | [x] | Shared (`src/shared/output.c`): raw bytes straight to the terminal via the platform output buffer + immediate flush, length-counted (embedded NULs allowed). For escape sequences libterm doesn't model. Tested in `tests/test_send.c` |
 | `tb_sendf` | `lt_sendf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_send` |
-| `tb_set_func` | `lt_set_func` | [ ] | [ ] | Custom `extract_event` / `extract_pre` / `extract_post` hook |
+| `tb_set_func` | `lt_set_func` | [—] | [—] | **Intentional divergence.** Custom parser-hook installer; termbox2 itself marks `tb_set_func` (and `TB_FUNC_EXTRACT_*`) deprecated, slated for removal in its 3.x. Mirroring it would add a function-pointer indirection into the input path for an API the upstream is dropping |
 
 ### UTF-8 helpers
 
@@ -79,7 +79,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 |---|---|---|---|---|
 | `tb_last_errno` | `lt_last_errno` | [x] | [—] | Returns the `errno` captured at the most recent failing POSIX syscall (open/isatty/tcgetattr/tcsetattr behind `LT_ERR_INIT_OPEN`, read/select behind `LT_ERR_READ`/`LT_ERR_POLL`); 0 if nothing failed. Stored in `lt__g.last_errno`. Tested in `tests/test_last_errno.c`. Windows has no `errno`-based syscall layer, so the getter exists but always returns 0 there (`[—]`) |
 | `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for **all 23** return codes (distinct messages + `"unknown error"` fallback); exhaustiveness + distinctness asserted in `tests/test_api.c` |
-| `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | termbox2's is a compile-time flag; superseded for mode-selection by `lt_detect_color_depth` below |
+| `tb_has_truecolor` | `lt_has_truecolor` | [—] | [—] | **Intentional divergence.** termbox2's is a compile-time flag; libterm supersedes it with the runtime `lt_detect_color_depth` (below), which is strictly more informative (returns the actual color ceiling, not just a truecolor yes/no) |
 | *(libterm addition)* | `lt_detect_color_depth` | [x] | [x] | Stateless runtime query: inspects `$COLORTERM` (`truecolor`/`24bit`) then `$TERM` (`*256color*` substring) and returns the terminal's color ceiling as an `LT_OUTPUT_*` mode (truecolor/256/normal). Pure standard-C `getenv` in `src/shared/output.c` — no platform code, safe to call before `lt_init`. Byte-exact logic asserted by hermetic `setenv`-driven test `tests/test_detect_color_depth.c` (harness POSIX-only; the function itself is platform-agnostic) |
 | `tb_has_egc` | `lt_has_egc` | [x] | [x] | Returns 1 — grapheme-cluster support is always built in (no compile-time opt-out, unlike termbox2's `TB_OPT_EGC`) |
 | `tb_attr_width` | `lt_attr_width` | [x] | [x] | Returns `sizeof(lt_attr)` = 4. libterm has no compile-time attribute-width option (`lt_attr` is always `uint32_t`), so it's constant. Tested in `tests/test_wcwidth.c` |
@@ -172,7 +172,7 @@ Declared: `LT_OUTPUT_CURRENT`, `LT_OUTPUT_NORMAL`, `LT_OUTPUT_256`, `LT_OUTPUT_2
 
 ### Function-hook ids (`TB_FUNC_*` → `LT_FUNC_*`)
 
-Not declared. Dependent on `lt_set_func`.
+Not declared — intentionally, alongside `lt_set_func` (deprecated upstream; see the Print / send helpers table).
 
 ### Version macros
 
@@ -226,7 +226,7 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 1. ~~**Windows SGR/color emission.**~~ **Resolved.** SGR emission was extracted into the shared `src/shared/sgr.c` (`lt__emit_sgr` / `lt__render_run`); both platforms now run it. Colors were visually confirmed in Windows Terminal (bench SGR workloads, real `WriteFile` output) and are guarded by an automated Windows byte test (`tests/test_win_sgr_output.c`) alongside the POSIX pty test.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are mapped for the escape-key families, and the modern CSI-u encoding (`\x1b[cp;mods u`, fixterms/kitty) is parsed so Ctrl/Shift/Alt+letter now arrive unambiguously where the terminal emits it. Legacy ambiguous cases (e.g. terminals that send bare control bytes without CSI-u) remain inherently lossy; behavior is not yet universal across every terminal.
 3. ~~**POSIX UTF-8 input semantics need parity hardening.**~~ **Resolved.** Multi-byte assembly + strict decode with `U+FFFD` fallback now resync correctly (no byte-swallowing on malformed input), covered end-to-end by a pty test (`tests/test_posix_input_utf8.c`) and decode boundary tests. Remaining input work is general cross-terminal escape-sequence coverage (poll/peek), not UTF-8.
-4. **Public API surface now closely tracks termbox2.** Remaining undeclared: `lt_init_file` / `lt_init_rwfd` (niche init variants) and `lt_set_func` (termbox2-deprecated parser hooks); `lt_has_truecolor` is intentionally omitted, superseded by `lt_detect_color_depth`. Everything else is implemented — `lt_init_fd`, print/send helpers (incl. `lt_printf_ex`), `lt_get_cell`, `lt_get_fds`, `lt_last_errno`, `lt_wcwidth`/`lt_iswprint`/`lt_attr_width`, and the grapheme-cluster set (`lt_set_cell_ex` / `lt_extend_cell` / `lt_has_egc`).
+4. **Public API surface complete on POSIX, modulo intentional divergences.** Every termbox2 public function is implemented except three deliberate omissions, now marked `[—]`: `lt_init_rwfd` (single-fd by design), `lt_set_func` (deprecated upstream), and `lt_has_truecolor` (superseded by `lt_detect_color_depth`). Implemented this round: `lt_init_file`, `lt_printf_ex`, `lt_attr_width` — plus, earlier, `lt_init_fd`, the print/send helpers, `lt_get_cell`, `lt_get_fds`, `lt_last_errno`, `lt_wcwidth`/`lt_iswprint`, and the grapheme-cluster set.
 5. **Output-mode parity now shares one code path.** Both platforms consume `lt_set_output_mode` through the shared `lt__emit_sgr`, so the previous POSIX-only / Windows-stores-only skew is gone; remaining work is the Windows verification noted in blocker #1.
 
 ---
