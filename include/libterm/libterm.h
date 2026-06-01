@@ -247,6 +247,17 @@ LT_API int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
  * (truncated if the result would exceed it), then prints the result. */
 LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...);
 
+/* ---- raw output ---- */
+/* Write raw bytes straight to the terminal, bypassing the cell buffer — for
+ * escape sequences libterm doesn't model (window title, custom modes, etc.).
+ * Buffered and flushed immediately. Returns LT_ERR_NOT_INIT before lt_init,
+ * LT_ERR on a NULL buffer. Bytes are emitted verbatim; the caller owns their
+ * correctness and any interaction with the rendered screen state. */
+LT_API int lt_send(const char *buf, size_t nbuf);
+/* printf-style wrapper over lt_send. Formats into an internal fixed buffer
+ * (truncated if the result would exceed it), then sends the result. */
+LT_API int lt_sendf(const char *fmt, ...);
+
 /* ---- input ---- */
 /* Event reads return LT_OK with an event, or LT_ERR_NO_EVENT when none is
  * available (poll timeout / interrupted). On a genuine I/O failure they return

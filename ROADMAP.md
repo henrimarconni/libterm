@@ -61,8 +61,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_print_ex` | `lt_print_ex` | [x] | [x] | As `lt_print`, with `out_w` = widest line's column count. Tested in `tests/test_print.c` |
 | `tb_printf` | `lt_printf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_print` |
 | `tb_printf_ex` | `lt_printf_ex` | [ ] | [ ] | Not declared (the `out_w` + printf variant); `lt_print_ex` + `lt_printf` cover the common cases |
-| `tb_send` | `lt_send` | [ ] | [ ] | |
-| `tb_sendf` | `lt_sendf` | [ ] | [ ] | |
+| `tb_send` | `lt_send` | [x] | [x] | Shared (`src/shared/output.c`): raw bytes straight to the terminal via the platform output buffer + immediate flush, length-counted (embedded NULs allowed). For escape sequences libterm doesn't model. Tested in `tests/test_send.c` |
+| `tb_sendf` | `lt_sendf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_send` |
 | `tb_set_func` | `lt_set_func` | [ ] | [ ] | Custom `extract_event` / `extract_pre` / `extract_post` hook |
 
 ### UTF-8 helpers

@@ -57,6 +57,11 @@ if(NOT WIN32)
     target_include_directories(test_get_cell PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_get_cell COMMAND test_get_cell)
     set_tests_properties(test_get_cell PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_send test_send.c)
+    target_link_libraries(test_send PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_send PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_send COMMAND test_send)
+    set_tests_properties(test_send PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
