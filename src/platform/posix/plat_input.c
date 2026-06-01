@@ -165,6 +165,11 @@ static void lt__posix_parse_csi_final_key(unsigned char final,
   case 'F':
     ev->key = LT_KEY_END;
     break;
+  case 'Z':
+    /* CSI Z = back-tab (Shift+Tab). Confirmed by tmux input-keys.c:121-122
+     * (KEYC_BTAB -> "\033[Z") and the kitty keyboard protocol. */
+    ev->key = LT_KEY_BACK_TAB;
+    break;
   default:
     break;
   }
@@ -430,11 +435,68 @@ static bool lt__posix_parse_mouse_sgr(const unsigned char *seq, size_t seq_len,
   return true;
 }
 
+/* Parse a CSI-u key report: ESC [ number ; modifiers u, the modern
+ * (fixterms / kitty / recent xterm) unambiguous key encoding. `number` is the
+ * key's Unicode codepoint; `modifiers` is 1 + a bitmask (shift=1, alt=2,
+ * ctrl=4, plus higher bits we have no LT_MOD_* for). On a well-formed report
+ * this fills ev (ch = codepoint, mod from the low bits) and returns true;
+ * otherwise returns false so the caller can try the other key paths.
+ * Reference: external/kitty/docs/keyboard-protocol.rst (CSI format + modifier
+ * table, "1 + actual modifiers"). */
+static bool lt__posix_parse_csi_u(const unsigned char *seq, size_t seq_len,
+                                  struct lt_event *ev) {
+  /* Shortest is ESC [ <digit> u = 4 bytes. */
+  if (seq_len < 4 || seq[1] != '[' || seq[seq_len - 1] != 'u')
+    return false;
+
+  int code = 0, mod_field = 0;
+  bool seen_code = false, in_mod = false;
+
+  for (size_t i = 2; i < seq_len - 1; i++) {
+    unsigned char c = seq[i];
+    if (c >= '0' && c <= '9') {
+      if (in_mod)
+        mod_field = mod_field * 10 + (c - '0');
+      else {
+        code = code * 10 + (c - '0');
+        seen_code = true;
+      }
+    } else if (c == ';' && !in_mod) {
+      in_mod = true;
+    } else {
+      return false; /* anything else (incl. a second ';' sub-field) -> not CSI-u */
+    }
+  }
+
+  if (!seen_code)
+    return false;
+
+  /* modifiers field is 1 + bitmask; absent means 1 (no modifiers). Decode the
+   * low three bits we model; ignore super/hyper/meta/locks. */
+  ev->mod = 0;
+  if (mod_field > 0) {
+    int bits = mod_field - 1;
+    if (bits & 1)
+      ev->mod |= LT_MOD_SHIFT;
+    if (bits & 2)
+      ev->mod |= LT_MOD_ALT;
+    if (bits & 4)
+      ev->mod |= LT_MOD_CTRL;
+  }
+
+  ev->type = LT_EVENT_KEY;
+  ev->ch = (lt_uchar)code;
+  return true;
+}
+
 static unsigned int lt__posix_parse_esc_seq(const unsigned char *seq,
                                             size_t seq_len,
                                             struct lt_event *ev) {
 
   if (lt__posix_parse_mouse_sgr(seq, seq_len, ev))
+    return LT_OK;
+
+  if (lt__posix_parse_csi_u(seq, seq_len, ev))
     return LT_OK;
 
   if (seq_len == 3 && seq[1] == '[') {
