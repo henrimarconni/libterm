@@ -1,0 +1,17 @@
+# Static-analysis check set for CI (.github/workflows/ci.yml, clang-tidy job).
+#
+# Intentionally conservative: the cross-translation-unit clang static analyzer
+# (clang-analyzer-*) is high-signal and runs clean on the portable code today.
+# The arch-specific SIMD intrinsics under src/intrinsics/ are NOT analyzed — they
+# compile for non-host ISAs (neon/sve/rvv) and clang-tidy can't parse them on the
+# host; the CI job restricts the file list to the portable sources accordingly.
+#
+# To tighten coverage later, add bugprone-* / portability-* incrementally and
+# fix or // NOLINT the findings they surface.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'src/.*'
+FormatStyle: file
