@@ -67,6 +67,20 @@ int main(void) {
   assert(cell_ch(2, 7) == '4');
   assert(cell_ch(3, 7) == '2');
 
+  /* lt_printf_ex: same as lt_printf, plus out_w = widest line's columns. */
+  {
+    size_t w = 0;
+    assert(lt_printf_ex(0, 9, LT_DEFAULT, LT_DEFAULT, &w, "%s", "ab\ncde") ==
+           LT_OK);
+    assert(cell_ch(0, 9) == 'a');
+    assert(cell_ch(0, 10) == 'c'); /* newline returned to start column */
+    assert(w == 3);                /* widest line "cde" */
+    /* out_w may be NULL. */
+    assert(lt_printf_ex(0, 12, LT_DEFAULT, LT_DEFAULT, NULL, "x=%d", 7) ==
+           LT_OK);
+    assert(cell_ch(0, 12) == 'x');
+  }
+
   /* Wide characters advance two columns: 你 at col 0, 好 lands at col 2, and
    * 'X' after it lands at col 4. out_w reflects the column span (5). */
   {

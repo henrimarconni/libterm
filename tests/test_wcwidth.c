@@ -44,5 +44,9 @@ int main(void) {
   assert(lt_iswprint(0x1B) == 0);   /* ESC not printable */
   assert(lt_iswprint(0x07) == 0);
 
+  /* lt_attr_width: lt_attr is uint32_t, so always 4. */
+  assert(lt_attr_width() == 4);
+  assert(lt_attr_width() == (int)sizeof(lt_attr));
+
   return 0;
 }

@@ -178,16 +178,31 @@ int lt_print(int x, int y, lt_attr fg, lt_attr bg, const char *str) {
   return lt_print_ex(x, y, fg, bg, NULL, str);
 }
 
-int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...) {
+/* Shared printf core: format into a fixed buffer, then print via lt_print_ex
+ * (out_w may be NULL). vsnprintf truncates into buf and NUL-terminates, so an
+ * over-long result is printed truncated rather than rejected. */
+static int lt__printf_into(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
+                           const char *fmt, va_list vl) {
   char buf[1024];
-  va_list vl;
-  va_start(vl, fmt);
   int n = vsnprintf(buf, sizeof(buf), fmt, vl);
-  va_end(vl);
-
   if (n < 0)
     return LT_ERR;
-  /* vsnprintf truncates into buf and NUL-terminates; an over-long result is
-   * printed truncated rather than rejected. */
-  return lt_print(x, y, fg, bg, buf);
+  return lt_print_ex(x, y, fg, bg, out_w, buf);
+}
+
+int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...) {
+  va_list vl;
+  va_start(vl, fmt);
+  int rc = lt__printf_into(x, y, fg, bg, NULL, fmt, vl);
+  va_end(vl);
+  return rc;
+}
+
+int lt_printf_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
+                 const char *fmt, ...) {
+  va_list vl;
+  va_start(vl, fmt);
+  int rc = lt__printf_into(x, y, fg, bg, out_w, fmt, vl);
+  va_end(vl);
+  return rc;
 }
