@@ -28,7 +28,9 @@ int lt__posix_get_tty_fd(void) { return 1; }
 
 /* Run/SGR emission moved out of plat_output.c into shared sgr.c (commit
  * 3e3db37); pull it into this TU so lt__render_run resolves against the same
- * captured output buffer. */
+ * captured output buffer. egc.c supplies lt__egc_get, which the cluster-aware
+ * render path references. */
+#include "../src/shared/egc.c"
 #include "../src/shared/sgr.c"
 
 struct lt__state lt__g;

@@ -195,7 +195,11 @@ struct lt_cell {
   lt_uchar ch;
   lt_attr fg;
   lt_attr bg;
-  uint32_t _reserved; /* pad to 16 B, cell-aligned for SIMD scans */
+  /* Pads the cell to 16 B (cell-aligned for SIMD scans). Also holds the
+   * grapheme-cluster id: 0 means the cell is just `ch`; nonzero indexes an
+   * internal table of the trailing combining/joined codepoints (see
+   * lt_set_cell_ex / lt_extend_cell). Treat as opaque — do not set directly. */
+  uint32_t _reserved;
 };
 
 struct lt_event {
@@ -236,6 +240,24 @@ LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
  * lt_set_cell). Returns LT_ERR_OUT_OF_BOUNDS for an off-buffer (x, y),
  * LT_ERR_NOT_INIT before lt_init, or LT_ERR if out is NULL. */
 LT_API int lt_get_cell(int x, int y, struct lt_cell *out);
+
+/* ---- grapheme clusters ---- */
+/* Write a grapheme cluster (a base codepoint plus trailing combining/joined
+ * codepoints, e.g. e + U+0301, or a ZWJ emoji sequence) into the cell at
+ * (x, y). `chs[0]` is the base; `chs[1..nch-1]` are the continuation
+ * codepoints. nch == 1 is equivalent to lt_set_cell. The cluster occupies one
+ * cell and advances the width of its base codepoint. Returns
+ * LT_ERR_OUT_OF_BOUNDS off-buffer, LT_ERR_NOT_INIT before init, LT_ERR on a
+ * NULL/empty chs, or LT_ERR_MEM if the cluster table is exhausted. */
+LT_API int lt_set_cell_ex(int x, int y, const lt_uchar *chs, size_t nch,
+                          lt_attr fg, lt_attr bg);
+/* Append one combining/joined codepoint to the cluster already in the cell at
+ * (x, y) (a shortcut for growing a cluster one codepoint at a time). The cell's
+ * base must already be set. Same error returns as lt_set_cell_ex. */
+LT_API int lt_extend_cell(int x, int y, lt_uchar ch);
+/* Non-zero if libterm was built with grapheme-cluster support (always 1 here;
+ * mirrors termbox2's compile-time tb_has_egc). */
+LT_API int lt_has_egc(void);
 
 /* ---- print helpers ---- */
 /* Write a UTF-8 string into the back buffer starting at (x, y), each cell in

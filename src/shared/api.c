@@ -53,6 +53,7 @@ int lt_shutdown(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
   lt__buffer_free();
+  lt__egc_reset();
 
   static const char sgr_reset[] = "\x1b[0m";
   (void)lt__plat_write(sgr_reset, sizeof(sgr_reset) - 1);

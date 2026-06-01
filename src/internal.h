@@ -75,6 +75,20 @@ int lt__utf8_encode(lt_uchar ch, char out[4]);
  * 1 (normal), or -1 (non-printable). Markus Kuhn reference ranges. */
 int lt__wcwidth(lt_uchar ch);
 
+/* ---- grapheme-cluster table (shared/egc.c) ----
+ * Interns a cluster (base + trailing codepoints) and returns a nonzero id to
+ * store in lt_cell._reserved; identical clusters share one id (content dedup),
+ * which keeps the SIMD byte-equality diff invariant valid. id 0 = no cluster.
+ * lt__egc_intern returns 0 on a single-codepoint cluster (caller stores the
+ * base in ch directly) or on allocation failure (*ok reports which). */
+uint32_t lt__egc_intern(const lt_uchar *chs, size_t nch, bool *ok);
+/* Look up an interned cluster by id: returns its codepoint array and sets
+ * *nch. Returns NULL for id 0 or an unknown id. */
+const lt_uchar *lt__egc_get(uint32_t id, size_t *nch);
+/* Drop all interned clusters (called from lt_shutdown so a fresh session
+ * starts with an empty table). */
+void lt__egc_reset(void);
+
 /* ---- SGR / run emission (shared/sgr.c) ----
  * Platform-independent VT byte construction; calls lt__plat_reserve/commit
  * (platform.h) to reach the per-platform output buffer. */

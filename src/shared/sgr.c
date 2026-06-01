@@ -208,6 +208,45 @@ int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
   return LT_OK;
 }
 
+/* Emit one cell's glyph bytes: the base codepoint, then any trailing cluster
+ * codepoints (combining marks / ZWJ joiners) the terminal composes onto it.
+ * Used only for spans that contain a cluster; the cluster-free fast path in
+ * lt__render_run stays byte-for-byte as it was. Reserves its own buffer per
+ * cell since a cluster's byte length is unbounded by the 4-per-cell estimate. */
+static int lt__render_cluster_cell(const struct lt_cell *c) {
+  size_t ncl = 0;
+  const lt_uchar *cl = lt__egc_get(c->_reserved, &ncl);
+
+  /* base + up to ncl continuation codepoints, 4 UTF-8 bytes each. */
+  size_t need = (size_t)4 * (1 + (cl ? ncl : 0));
+  char *p = lt__plat_reserve(need);
+  if (!p)
+    return LT_ERR;
+
+  size_t pos = 0;
+  char tmp[4];
+
+  lt_uchar base = c->ch ? c->ch : (lt_uchar)' ';
+  int ub = lt__utf8_encode(base, tmp);
+  if (ub <= 0) {
+    p[pos++] = ' ';
+  } else {
+    for (int t = 0; t < ub; t++)
+      p[pos++] = tmp[t];
+  }
+
+  for (size_t m = 0; cl && m < ncl; m++) {
+    ub = lt__utf8_encode(cl[m], tmp);
+    if (ub <= 0)
+      continue; /* skip an unencodable continuation rather than emit junk */
+    for (int t = 0; t < ub; t++)
+      p[pos++] = tmp[t];
+  }
+
+  lt__plat_commit(pos);
+  return LT_OK;
+}
+
 int lt__render_run(const struct lt_cell *cells, int count) {
   if (count <= 0)
     return LT_OK;
@@ -249,6 +288,29 @@ int lt__render_run(const struct lt_cell *cells, int count) {
     }
 
     span_len = j - i;
+
+    /* Does this span contain any grapheme cluster (_reserved != 0)? Clusters
+     * are rare, so the common answer is "no" and we take the original
+     * single-reserve fast path below. A span with a cluster falls back to
+     * per-cell emission, since a cluster's byte length exceeds the 4-per-cell
+     * reserve estimate. */
+    bool has_cluster = false;
+    for (int k = i; k < j; k++)
+      if (cells[k]._reserved != 0) {
+        has_cluster = true;
+        break;
+      }
+
+    if (has_cluster) {
+      for (int k = i; k < j; k++) {
+        rc = lt__render_cluster_cell(&cells[k]);
+        if (rc != LT_OK)
+          return rc;
+      }
+      i = j;
+      continue;
+    }
+
     max = (size_t)span_len * 4;
     p = lt__plat_reserve(max);
     if (!p) {
