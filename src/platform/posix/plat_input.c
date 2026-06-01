@@ -9,6 +9,15 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+/* Inter-byte grace period while assembling a multi-byte input sequence (escape
+ * sequence or UTF-8 character). A terminal can deliver the bytes fragmented
+ * (SSH, a loaded host, a slow pipe); a zero timeout would see an empty fd
+ * between fragments and truncate the sequence — misreporting an arrow key as a
+ * bare ESC, or a multi-byte character as U+FFFD. This is also the standard
+ * "lone ESC vs. start of a sequence" disambiguation window: a real Escape
+ * keypress costs at most this much latency before it resolves. */
+#define LT__ESC_SEQ_TIMEOUT_MS 50
+
 /* Bytes pending re-delivery as standalone events, replayed one at a time on the
  * following reads. Two producers stash here: LT_INPUT_ESC (an unrecognized
  * ESC-prefixed combo emits LT_KEY_ESC, then the trailing byte) and the UTF-8
@@ -38,12 +47,21 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
   int rc = 0;
 
   while (len < want) {
-    memset(&tv, 0, sizeof(tv));
+    /* Same grace period as the escape-sequence reader: a multi-byte UTF-8
+     * character can arrive fragmented, and a zero timeout would truncate it
+     * into a spurious U+FFFD. See LT__ESC_SEQ_TIMEOUT_MS. */
+    tv.tv_sec = 0;
+    tv.tv_usec = LT__ESC_SEQ_TIMEOUT_MS * 1000;
 
     FD_ZERO(&rfds);
     FD_SET(ttyfd, &rfds);
     rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
-    if (rc <= 0)
+    if (rc < 0) {
+      if (errno == EINTR)
+        continue;
+      break;
+    }
+    if (rc == 0)
       break;
 
     ssize_t n = read(ttyfd, &buf[len], 1);
@@ -75,15 +93,22 @@ static size_t lt__posix_read_esc_tail(unsigned char *buf, size_t cap) {
     return len;
 
   while (len < cap) {
-    struct timeval tv = {.tv_sec = 0, .tv_usec = 0};
+    /* Reset every iteration: Linux's select() updates tv with the unslept
+     * remainder, so a shared tv would shrink toward zero across bytes. */
+    struct timeval tv = {.tv_sec = 0, .tv_usec = LT__ESC_SEQ_TIMEOUT_MS * 1000};
 
     fd_set rfds;
     FD_ZERO(&rfds);
     FD_SET(ttyfd, &rfds);
 
     rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
-    if (rc <= 0)
+    if (rc < 0) {
+      if (errno == EINTR)
+        continue; /* interrupted before any byte was ready; wait again */
       break;
+    }
+    if (rc == 0)
+      break; /* no more bytes within the grace period: sequence is complete */
 
     n = read(ttyfd, &buf[len], 1);
     if (n != 1)

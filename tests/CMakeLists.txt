@@ -41,6 +41,11 @@ if(NOT WIN32)
     target_include_directories(test_posix_input_utf8 PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_posix_input_utf8 COMMAND test_posix_input_utf8)
     set_tests_properties(test_posix_input_utf8 PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_posix_input_frag test_posix_input_frag.c)
+    target_link_libraries(test_posix_input_frag PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_posix_input_frag PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_posix_input_frag COMMAND test_posix_input_frag)
+    set_tests_properties(test_posix_input_frag PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
