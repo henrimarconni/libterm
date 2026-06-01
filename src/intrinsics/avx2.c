@@ -52,9 +52,10 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 }
 
 /* AVX2 first-equal-cell: 16-byte cells x 2 per ymm. A cell is equal iff
- * its 16 movemask bits are all set. Relies on Step E's invariant that
- * `_reserved` is 0 in both buffers, which makes 16-byte byte-equality
- * equivalent to field-equality. */
+ * its 16 movemask bits are all set. The 16-byte compare includes _reserved
+ * (the cluster id), which is exactly what cell-equality requires: two cells
+ * render the same iff ch/fg/bg AND cluster match (ids are content-deduped, so
+ * equal id <=> equal cluster). The scalar tail below compares the same fields. */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)
