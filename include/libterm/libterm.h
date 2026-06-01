@@ -222,6 +222,11 @@ LT_API int lt_height(void);
 LT_API int lt_clear(void);
 LT_API int lt_set_clear_attrs(lt_attr fg, lt_attr bg);
 LT_API int lt_present(void);
+/* Force the next lt_present to repaint every cell, bypassing the diff. Use
+ * after emitting raw bytes via lt_send (or any out-of-band terminal write) that
+ * desynced libterm's screen model from what is actually displayed. Returns
+ * LT_ERR_NOT_INIT before lt_init. */
+LT_API int lt_invalidate(void);
 LT_API int lt_set_cursor(int x, int y);
 LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);

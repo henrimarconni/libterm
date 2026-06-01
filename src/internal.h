@@ -37,6 +37,7 @@ struct lt__render_stats {
 struct lt__state {
   bool initialized;
   bool *dirty_rows;
+  bool force_repaint; /* lt_invalidate: next present repaints every cell */
   int width;
   int height;
   int input_mode;
