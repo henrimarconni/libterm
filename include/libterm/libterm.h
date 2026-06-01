@@ -226,6 +226,10 @@ LT_API int lt_set_cursor(int x, int y);
 LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
+/* Copy the back-buffer cell at (x, y) into *out (the buffer consumers write via
+ * lt_set_cell). Returns LT_ERR_OUT_OF_BOUNDS for an off-buffer (x, y),
+ * LT_ERR_NOT_INIT before lt_init, or LT_ERR if out is NULL. */
+LT_API int lt_get_cell(int x, int y, struct lt_cell *out);
 
 /* ---- print helpers ---- */
 /* Write a UTF-8 string into the back buffer starting at (x, y), each cell in
@@ -242,6 +246,17 @@ LT_API int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
 /* printf-style wrapper over lt_print. Formats into an internal fixed buffer
  * (truncated if the result would exceed it), then prints the result. */
 LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...);
+
+/* ---- raw output ---- */
+/* Write raw bytes straight to the terminal, bypassing the cell buffer — for
+ * escape sequences libterm doesn't model (window title, custom modes, etc.).
+ * Buffered and flushed immediately. Returns LT_ERR_NOT_INIT before lt_init,
+ * LT_ERR on a NULL buffer. Bytes are emitted verbatim; the caller owns their
+ * correctness and any interaction with the rendered screen state. */
+LT_API int lt_send(const char *buf, size_t nbuf);
+/* printf-style wrapper over lt_send. Formats into an internal fixed buffer
+ * (truncated if the result would exceed it), then sends the result. */
+LT_API int lt_sendf(const char *fmt, ...);
 
 /* ---- input ---- */
 /* Event reads return LT_OK with an event, or LT_ERR_NO_EVENT when none is

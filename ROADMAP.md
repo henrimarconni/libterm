@@ -36,7 +36,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_set_cell` | `lt_set_cell` | [x] | [x] | Bounds-checked write into back buffer |
 | `tb_set_cell_ex` | `lt_set_cell_ex` | [ ] | [ ] | Not declared (multi-codepoint EGC variant) |
 | `tb_extend_cell` | `lt_extend_cell` | [ ] | [ ] | Not declared |
-| `tb_get_cell` | `lt_get_cell` | [ ] | [ ] | Not declared |
+| `tb_get_cell` | `lt_get_cell` | [x] | [x] | Shared (`src/shared/cell.c`): copies the back-buffer cell at (x, y) into a caller `struct lt_cell` (value copy, not an internal pointer like termbox2). Bounds-checked; `LT_ERR_NOT_INIT` before init. Tested in `tests/test_get_cell.c` |
 
 ### Input
 
@@ -61,8 +61,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_print_ex` | `lt_print_ex` | [x] | [x] | As `lt_print`, with `out_w` = widest line's column count. Tested in `tests/test_print.c` |
 | `tb_printf` | `lt_printf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_print` |
 | `tb_printf_ex` | `lt_printf_ex` | [ ] | [ ] | Not declared (the `out_w` + printf variant); `lt_print_ex` + `lt_printf` cover the common cases |
-| `tb_send` | `lt_send` | [ ] | [ ] | |
-| `tb_sendf` | `lt_sendf` | [ ] | [ ] | |
+| `tb_send` | `lt_send` | [x] | [x] | Shared (`src/shared/output.c`): raw bytes straight to the terminal via the platform output buffer + immediate flush, length-counted (embedded NULs allowed). For escape sequences libterm doesn't model. Tested in `tests/test_send.c` |
+| `tb_sendf` | `lt_sendf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_send` |
 | `tb_set_func` | `lt_set_func` | [ ] | [ ] | Custom `extract_event` / `extract_pre` / `extract_post` hook |
 
 ### UTF-8 helpers

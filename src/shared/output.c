@@ -2,6 +2,8 @@
 #include "intrinsics/diff.h"
 #include "platform.h"
 #include "string.h"
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 static int lt__present_abort(int err) {
@@ -183,4 +185,39 @@ int lt_detect_color_depth(void) {
     return LT_OUTPUT_256;
 
   return LT_OUTPUT_NORMAL;
+}
+
+int lt_send(const char *buf, size_t nbuf) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+  if (!buf)
+    return LT_ERR;
+  if (nbuf == 0)
+    return LT_OK;
+
+  int rc = lt__plat_write(buf, nbuf);
+  if (rc != LT_OK)
+    return rc;
+  return lt__plat_flush();
+}
+
+int lt_sendf(const char *fmt, ...) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+  if (!fmt)
+    return LT_ERR;
+
+  char out[1024];
+  va_list vl;
+  va_start(vl, fmt);
+  int n = vsnprintf(out, sizeof(out), fmt, vl);
+  va_end(vl);
+
+  if (n < 0)
+    return LT_ERR;
+  /* vsnprintf returns the length it *would* have written; clamp to what
+   * actually landed in the buffer so an over-long format sends truncated
+   * rather than reading past `out`. */
+  size_t len = ((size_t)n < sizeof(out)) ? (size_t)n : sizeof(out) - 1;
+  return lt_send(out, len);
 }
