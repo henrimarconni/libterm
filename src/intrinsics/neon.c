@@ -61,7 +61,9 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 
 /* NEON first-equal: a 128-bit vector is exactly one 16-byte cell. The cell is
  * equal iff all 16 byte-compares are true, i.e. the nibble movemask is all-ones.
- * Relies on the _reserved==0 invariant so byte-equality == field-equality. */
+ * The 16-byte compare includes _reserved (the cluster id), which is exactly
+ * what cell-equality requires: two cells render the same iff ch/fg/bg AND
+ * cluster match (ids are content-deduped, so equal id <=> equal cluster). */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)

@@ -80,7 +80,9 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
 
   int i = pairs * 2;
   if (i < count) {
-    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg)
+    /* Include _reserved (cluster id) to match the byte-wise vector path above. */
+    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg &&
+        a[i]._reserved == b[i]._reserved)
       return i;
   }
 

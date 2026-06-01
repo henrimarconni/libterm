@@ -77,7 +77,9 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
 
   /* tail: up to 3 cells, scalar */
   for (int i = groups * 4; i < count; i++) {
-    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg)
+    /* Include _reserved (cluster id) to match the byte-wise vector path above. */
+    if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg &&
+        a[i]._reserved == b[i]._reserved)
       return i;
   }
   return count;
