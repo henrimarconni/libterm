@@ -93,22 +93,26 @@ fail:
   return rc;
 }
 
-int lt__plat_init(void) {
+int lt__plat_init_file(const char *path) {
 #if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)
+  (void)path;
   return LT_OK;
 #endif
 
   if (lt__posix_tty_fd >= 0)
     return LT_ERR_INIT_ALREADY;
 
-  int fd = open("/dev/tty", O_RDWR);
+  int fd = open(path, O_RDWR);
   if (fd < 0) {
     lt__g.last_errno = errno;
     return LT_ERR_INIT_OPEN;
   }
 
+  /* owned=1: we opened it, so lt_shutdown closes it. */
   return lt__plat_init_fd(fd, 1);
 }
+
+int lt__plat_init(void) { return lt__plat_init_file("/dev/tty"); }
 
 int lt__plat_shutdown(void) {
 #if defined(LIBTERM_BENCH_HEADLESS_OUTPUT)

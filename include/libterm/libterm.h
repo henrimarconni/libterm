@@ -219,6 +219,12 @@ LT_API int lt_init(void);
  * tty (validated with isatty); it is NOT closed by lt_shutdown — the caller
  * owns it. On non-POSIX platforms this returns LT_ERR_INIT_OPEN. */
 LT_API int lt_init_fd(int ttyfd);
+/* Initialize against a terminal opened from `path` (e.g. "/dev/tty",
+ * "/dev/pts/3"), POSIX. Opens the path O_RDWR; the fd IS closed by lt_shutdown
+ * (libterm owns it, unlike lt_init_fd). Returns LT_ERR_INIT_OPEN if the path
+ * can't be opened or isn't a tty (lt_last_errno carries the cause). On
+ * non-POSIX platforms this returns LT_ERR_INIT_OPEN. */
+LT_API int lt_init_file(const char *path);
 LT_API int lt_shutdown(void);
 
 /* ---- screen ---- */
