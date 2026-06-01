@@ -26,6 +26,11 @@ int lt__posix_get_tty_fd(void) { return 1; }
 #undef write
 #undef static
 
+/* Run/SGR emission moved out of plat_output.c into shared sgr.c (commit
+ * 3e3db37); pull it into this TU so lt__render_run resolves against the same
+ * captured output buffer. */
+#include "../src/shared/sgr.c"
+
 struct lt__state lt__g;
 
 int lt__utf8_encode(lt_uchar ch, char out[4]) {
@@ -95,7 +100,7 @@ static void test_split_sgr_for_mixed_style_run(void) {
   cells[0] = one_cell('A', LT_RED, LT_DEFAULT);
   cells[1] = one_cell('B', LT_GREEN, LT_DEFAULT);
 
-  assert(lt__plat_render_run(cells, 2) == LT_OK);
+  assert(lt__render_run(cells, 2) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   assert(memchr(g_capture, 'A', g_capture_len) != NULL);
@@ -107,7 +112,7 @@ static void test_mode_normal_sgr_shape(void) {
   prepare_state(LT_OUTPUT_NORMAL);
 
   struct lt_cell c = one_cell('N', LT_RED, LT_BLUE);
-  assert(lt__plat_render_run(&c, 1) == LT_OK);
+  assert(lt__render_run(&c, 1) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   assert(contains_substr(g_capture, g_capture_len, "\x1b["));
@@ -120,7 +125,7 @@ static void test_mode_256_sgr_shape(void) {
   prepare_state(LT_OUTPUT_256);
 
   struct lt_cell c = one_cell('2', LT_RED, LT_BLUE);
-  assert(lt__plat_render_run(&c, 1) == LT_OK);
+  assert(lt__render_run(&c, 1) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   /* fail-first: should become true after LT_OUTPUT_256 implementation */
@@ -132,7 +137,7 @@ static void test_mode_truecolor_sgr_shape(void) {
   prepare_state(LT_OUTPUT_TRUECOLOR);
 
   struct lt_cell c = one_cell('T', LT_RED, LT_BLUE);
-  assert(lt__plat_render_run(&c, 1) == LT_OK);
+  assert(lt__render_run(&c, 1) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   /* fail-first: should become true after LT_OUTPUT_TRUECOLOR implementation
@@ -145,7 +150,7 @@ static void test_mode_216_sgr_shape(void) {
   prepare_state(LT_OUTPUT_216);
 
   struct lt_cell c = one_cell('H', LT_RED, LT_BLUE);
-  assert(lt__plat_render_run(&c, 1) == LT_OK);
+  assert(lt__render_run(&c, 1) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   /* fail-first: 216 mode should map into 256 palette form */
@@ -157,7 +162,7 @@ static void test_mode_grayscale_sgr_shape(void) {
   prepare_state(LT_OUTPUT_GRAYSCALE);
 
   struct lt_cell c = one_cell('G', LT_RED, LT_BLUE);
-  assert(lt__plat_render_run(&c, 1) == LT_OK);
+  assert(lt__render_run(&c, 1) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   /* fail-first: grayscale mode should map into 256 palette form */
@@ -182,7 +187,7 @@ int main(void) {
   cells[1].bg = LT_DEFAULT;
 
   reset_capture();
-  assert(lt__plat_render_run(cells, 2) == LT_OK);
+  assert(lt__render_run(cells, 2) == LT_OK);
   assert(lt__plat_flush() == LT_OK);
 
   assert(memchr(g_capture, 'A', g_capture_len) != NULL);
