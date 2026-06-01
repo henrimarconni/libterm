@@ -274,6 +274,10 @@ LT_API int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
 /* printf-style wrapper over lt_print. Formats into an internal fixed buffer
  * (truncated if the result would exceed it), then prints the result. */
 LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...);
+/* As lt_printf, but if out_w is non-NULL it receives the number of columns
+ * advanced on the widest line written (see lt_print_ex). */
+LT_API int lt_printf_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
+                        const char *fmt, ...);
 
 /* ---- raw output ---- */
 /* Write raw bytes straight to the terminal, bypassing the cell buffer — for
@@ -340,6 +344,10 @@ LT_API int lt_utf8_unicode_to_char(char *out, uint32_t c);
 LT_API int lt_wcwidth(uint32_t ch);
 /* Non-zero if the codepoint is printable (i.e. lt_wcwidth(ch) >= 0). */
 LT_API int lt_iswprint(uint32_t ch);
+/* Byte width of the lt_attr type used for fg/bg (always 4 — lt_attr is
+ * uint32_t). Mirrors termbox2's tb_attr_width; libterm has no compile-time
+ * attribute-width option, so this is constant. */
+LT_API int lt_attr_width(void);
 
 /* ---- misc ---- */
 LT_API const char *lt_strerror(int code);

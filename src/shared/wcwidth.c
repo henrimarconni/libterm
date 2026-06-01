@@ -162,3 +162,5 @@ int lt__wcwidth(lt_uchar ch) {
 int lt_wcwidth(uint32_t ch) { return lt__wcwidth((lt_uchar)ch); }
 
 int lt_iswprint(uint32_t ch) { return lt__wcwidth((lt_uchar)ch) >= 0 ? 1 : 0; }
+
+int lt_attr_width(void) { return (int)sizeof(lt_attr); }
