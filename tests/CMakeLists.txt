@@ -11,6 +11,7 @@ function(libterm_add_test name)
 endfunction()
 
 libterm_add_test(test_utf8)
+libterm_add_test(test_wcwidth)
 libterm_add_test(test_buffer)
 libterm_add_test(test_api)
 libterm_add_test(test_simd_diff)

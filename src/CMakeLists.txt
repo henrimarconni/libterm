@@ -7,6 +7,7 @@ set(LIBTERM_SHARED_SOURCES
     shared/output.c
     shared/sgr.c
     shared/utf8.c
+    shared/wcwidth.c
 )
 
 if(WIN32)

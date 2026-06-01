@@ -67,6 +67,30 @@ int main(void) {
   assert(cell_ch(2, 7) == '4');
   assert(cell_ch(3, 7) == '2');
 
+  /* Wide characters advance two columns: 你 at col 0, 好 lands at col 2, and
+   * 'X' after it lands at col 4. out_w reflects the column span (5). */
+  {
+    size_t w = 0;
+    /* "你好X" = U+4F60 U+597D 'X' */
+    assert(lt_print_ex(0, 10, LT_DEFAULT, LT_DEFAULT, &w,
+                       "\xE4\xBD\xA0\xE5\xA5\xBDX") == LT_OK);
+    assert(cell_ch(0, 10) == 0x4F60); /* 你 */
+    assert(cell_ch(2, 10) == 0x597D); /* 好 (col 1 left for the wide glyph) */
+    assert(cell_ch(4, 10) == 'X');
+    assert(w == 5);
+  }
+
+  /* A combining mark occupies zero columns and is not placed in its own cell:
+   * "e" + U+0301 then "Z" -> 'e' at col 0, 'Z' at col 1. */
+  {
+    size_t w = 0;
+    assert(lt_print_ex(0, 11, LT_DEFAULT, LT_DEFAULT, &w,
+                       "e\xCC\x81Z") == LT_OK);
+    assert(cell_ch(0, 11) == 'e');
+    assert(cell_ch(1, 11) == 'Z');
+    assert(w == 2);
+  }
+
   /* Off-buffer cells are clipped, not errored: start in bounds, run past the
    * right edge -> still LT_OK, no crash (ASAN guards the OOB write). */
   assert(lt_print(78, 8, LT_DEFAULT, LT_DEFAULT, "ABCDE") == LT_OK);
