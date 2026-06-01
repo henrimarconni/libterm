@@ -139,6 +139,76 @@ static void run_mouse_sgr(void) {
   }
 }
 
+/* Back-tab (Shift+Tab): CSI Z. Ref: tmux input-keys.c:121 (KEYC_BTAB ->
+ * "\033[Z"), kitty keyboard-protocol.rst. */
+static void run_back_tab(void) {
+  const unsigned char s[] = {'\x1b', '[', 'Z'};
+  expect_seq(s, sizeof(s), LT_KEY_BACK_TAB, 0);
+}
+
+/* CSI-u (fixterms/kitty): ESC [ codepoint ; (1+mods) u. Asserts the codepoint
+ * lands in ev.ch and the modifier bits decode. Ref:
+ * external/kitty/docs/keyboard-protocol.rst. */
+static void expect_csi_u(const unsigned char *seq, size_t len, lt_uchar want_ch,
+                         uint8_t want_mod) {
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  int rc = lt__posix_parse_esc_seq(seq, len, &ev);
+  assert(rc == LT_OK);
+  assert(ev.type == LT_EVENT_KEY);
+  assert(ev.ch == want_ch);
+  assert(ev.mod == want_mod);
+}
+
+static void run_csi_u(void) {
+  /* Plain 'a' (codepoint 97), no modifier field -> no mods. */
+  {
+    const unsigned char s[] = "\x1b[97u";
+    expect_csi_u(s, sizeof(s) - 1, 97, 0);
+  }
+  /* Ctrl+a: modifiers = 1 + 4 = 5. */
+  {
+    const unsigned char s[] = "\x1b[97;5u";
+    expect_csi_u(s, sizeof(s) - 1, 97, LT_MOD_CTRL);
+  }
+  /* Shift only: 1 + 1 = 2. */
+  {
+    const unsigned char s[] = "\x1b[97;2u";
+    expect_csi_u(s, sizeof(s) - 1, 97, LT_MOD_SHIFT);
+  }
+  /* Ctrl+Shift: 1 + 0b101 = 6 (kitty spec's worked example). */
+  {
+    const unsigned char s[] = "\x1b[97;6u";
+    expect_csi_u(s, sizeof(s) - 1, 97, LT_MOD_SHIFT | LT_MOD_CTRL);
+  }
+  /* Alt: 1 + 2 = 3. */
+  {
+    const unsigned char s[] = "\x1b[97;3u";
+    expect_csi_u(s, sizeof(s) - 1, 97, LT_MOD_ALT);
+  }
+  /* High modifier bits we don't model (super = 8 -> field 9) decode to no
+   * LT_MOD_* and must not corrupt the low bits: super+ctrl = 1+4+8 = 13. */
+  {
+    const unsigned char s[] = "\x1b[97;13u";
+    expect_csi_u(s, sizeof(s) - 1, 97, LT_MOD_CTRL);
+  }
+  /* Multi-digit codepoint: U+20AC (8364) = euro. */
+  {
+    const unsigned char s[] = "\x1b[8364u";
+    expect_csi_u(s, sizeof(s) - 1, 8364, 0);
+  }
+
+  /* Negatives: missing codepoint, and a second sub-field (not CSI-u shape). */
+  {
+    const unsigned char s[] = "\x1b[;5u"; /* no codepoint */
+    expect_no_key(s, sizeof(s) - 1);
+  }
+  {
+    const unsigned char s[] = "\x1b[97;5;3u"; /* extra ';' field */
+    expect_no_key(s, sizeof(s) - 1);
+  }
+}
+
 struct mod_case {
   unsigned char digit;
   uint8_t want_mod;
@@ -267,10 +337,10 @@ static void run_negative_cases(void) {
     const unsigned char s[] = {'\x1b', '['};
     expect_no_key(s, sizeof(s));
   }
-  /* Unknown 3-byte CSI final ('Z' = shift-tab in some terms, not mapped). */
+  /* CSI Z is back-tab (Shift+Tab) — now mapped (see run_back_tab below). */
   {
     const unsigned char s[] = {'\x1b', '[', 'Z'};
-    expect_no_key(s, sizeof(s));
+    expect_seq(s, sizeof(s), LT_KEY_BACK_TAB, 0);
   }
   /* Garbage CSI final. */
   {
@@ -420,5 +490,7 @@ int main(void) {
   run_input_mode_alt();
   run_input_mode_esc();
   run_mouse_sgr();
+  run_back_tab();
+  run_csi_u();
   return 0;
 }

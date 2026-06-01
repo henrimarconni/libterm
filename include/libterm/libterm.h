@@ -84,6 +84,7 @@ extern "C" {
 #define LT_KEY_ARROW_DOWN (0xFFFF - 19)
 #define LT_KEY_ARROW_LEFT (0xFFFF - 20)
 #define LT_KEY_ARROW_RIGHT (0xFFFF - 21)
+#define LT_KEY_BACK_TAB (0xFFFF - 22) /* Shift+Tab, CSI Z; mirrors termbox2 */
 
 /* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE) ----
  * Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
