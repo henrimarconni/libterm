@@ -29,7 +29,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_clear` | `lt_clear` | [x] | [x] | Clears back buffer with current clear attrs |
 | `tb_set_clear_attrs` | `lt_set_clear_attrs` | [x] | [x] | Returns `LT_ERR_NOT_INIT` before `lt_init` (consistent with `lt_clear`/`lt_present`/`lt_set_cell`) |
 | `tb_present` | `lt_present` | [x] | [x] | Shared diff loop skips cells where `back == front` (3-field equality), caches cursor position, coalesces runs, and flushes buffered output. The run/SGR emission now lives in **shared** `src/shared/sgr.c` (`lt__render_run` → `lt__emit_sgr`), so both platforms emit the same mode-aware SGR for all five output modes — normal/256/216/grayscale/truecolor — with a `LT_HI_BLACK` sentinel separating terminal-default from real black. Output bytes asserted on POSIX via pty (`tests/test_posix_sgr_output.c`); Windows uses the identical shared code (real-terminal visual confirmation pending, no Windows-native byte test yet) |
-| `tb_invalidate` | `lt_invalidate` | [ ] | [ ] | Not declared |
+| `tb_invalidate` | `lt_invalidate` | [x] | [x] | Shared (`src/shared/output.c`): sets a `force_repaint` flag so the next `lt_present` repaints every cell (bypassing the diff) and re-emits SGR from scratch; consumed once. For recovering after raw `lt_send` (or other out-of-band writes) desync libterm's screen model. Tested in `tests/test_invalidate.c` |
 | `tb_set_cursor` | `lt_set_cursor` | [x] | [x] | Both platforms emit `\x1b[r;cH` with hand-rolled integer formatting (no `snprintf` in render hot path) |
 | `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
 | *(libterm addition)* | `lt_show_cursor` | [x] | [x] | Mirror of `lt_hide_cursor` |

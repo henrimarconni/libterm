@@ -44,8 +44,15 @@ int lt_present(void) {
   if (!lt__g.back || !lt__g.front || lt__g.width <= 0 || lt__g.height <= 0)
     return LT_ERR_NOT_INIT;
 
+  /* lt_invalidate sets this: repaint every cell this frame, ignoring the diff,
+   * because the on-screen state may have been desynced out of band (raw
+   * lt_send). Consumed once, then cleared. */
+  bool force = lt__g.force_repaint;
+  lt__g.force_repaint = false;
+
   /* Fast-path: no dirty rows means nothing to render. Skipping the
-   * sync brackets here keeps no-change presents free (no WriteFile). */
+   * sync brackets here keeps no-change presents free (no WriteFile). A forced
+   * repaint always runs, even with no dirty rows. */
   bool any_dirty = false;
   for (int y = 0; y < lt__g.height; y++)
     if (lt__g.dirty_rows[y]) {
@@ -53,7 +60,7 @@ int lt_present(void) {
       break;
     }
 
-  if (!any_dirty)
+  if (!any_dirty && !force)
     return lt__plat_flush();
 
 #if LT_RENDER_STATS
@@ -74,7 +81,8 @@ int lt_present(void) {
   int mc = 0, rc = 0, rest = 0, run_len = 0, run_end = 0, skip = 0;
 
   for (int y = 0; y < lt__g.height; y++) {
-    if (!lt__g.dirty_rows[y])
+    /* A forced repaint visits every row; otherwise only dirty ones. */
+    if (!force && !lt__g.dirty_rows[y])
       continue;
 
 #if LT_RENDER_STATS
@@ -83,20 +91,29 @@ int lt_present(void) {
 
     int x = 0;
     while (x < lt__g.width) {
-      /* SIMD outer skip: advance past all equal cells */
-      skip = lt__simd_diff_first_differ_cell(&lt__g.back[y * lt__g.width + x],
-                                             &lt__g.front[y * lt__g.width + x],
-                                             lt__g.width - x);
+      if (force) {
+        /* Skip the diff entirely: emit the whole row as one run. */
+        skip = 0;
+      } else {
+        /* SIMD outer skip: advance past all equal cells */
+        skip = lt__simd_diff_first_differ_cell(
+            &lt__g.back[y * lt__g.width + x], &lt__g.front[y * lt__g.width + x],
+            lt__g.width - x);
+      }
       x += skip;
       if (x >= lt__g.width)
         break;
 
       idx = (size_t)(y * lt__g.width + x);
 
-      /* SIMD inner walk: find end of changed run by locating first equal */
-      rest = lt__simd_diff_first_equal_cell(
-          &lt__g.back[idx + 1], &lt__g.front[idx + 1], lt__g.width - x - 1);
-      run_len = 1 + rest;
+      if (force) {
+        run_len = lt__g.width - x; /* rest of the row in one block */
+      } else {
+        /* SIMD inner walk: find end of changed run by locating first equal */
+        rest = lt__simd_diff_first_equal_cell(
+            &lt__g.back[idx + 1], &lt__g.front[idx + 1], lt__g.width - x - 1);
+        run_len = 1 + rest;
+      }
       run_end = x + run_len;
 #if LT_RENDER_STATS
       lt__g.stats.diff_runs++;
@@ -141,6 +158,20 @@ int lt_present(void) {
   (void)lt__plat_write(sync_end, sizeof(sync_end) - 1);
 
   return lt__plat_flush();
+}
+
+int lt_invalidate(void) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+
+  /* Force a full repaint on the next present. Also invalidate the SGR cache so
+   * the first run re-emits its colors/attrs from scratch (the terminal's actual
+   * SGR state is unknown after an out-of-band write). */
+  lt__g.force_repaint = true;
+  lt__g.cur_fg = 0xFFFFFFFF;
+  lt__g.cur_bg = 0xFFFFFFFF;
+  lt__g.cur_attrs = 0xFFFFFFFF;
+  return LT_OK;
 }
 
 int lt_set_cursor(int x, int y) {

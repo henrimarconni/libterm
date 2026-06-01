@@ -62,6 +62,11 @@ if(NOT WIN32)
     target_include_directories(test_send PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_send COMMAND test_send)
     set_tests_properties(test_send PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_invalidate test_invalidate.c)
+    target_link_libraries(test_invalidate PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_invalidate PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_invalidate COMMAND test_invalidate)
+    set_tests_properties(test_invalidate PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
