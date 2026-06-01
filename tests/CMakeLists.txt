@@ -77,6 +77,11 @@ if(NOT WIN32)
     target_include_directories(test_get_fds PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_get_fds COMMAND test_get_fds)
     set_tests_properties(test_get_fds PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_egc test_egc.c)
+    target_link_libraries(test_egc PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_egc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_egc COMMAND test_egc)
+    set_tests_properties(test_egc PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a

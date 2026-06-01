@@ -34,8 +34,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_hide_cursor` | `lt_hide_cursor` | [x] | [x] | |
 | *(libterm addition)* | `lt_show_cursor` | [x] | [x] | Mirror of `lt_hide_cursor` |
 | `tb_set_cell` | `lt_set_cell` | [x] | [x] | Bounds-checked write into back buffer |
-| `tb_set_cell_ex` | `lt_set_cell_ex` | [ ] | [ ] | Not declared (multi-codepoint EGC variant) |
-| `tb_extend_cell` | `lt_extend_cell` | [ ] | [ ] | Not declared |
+| `tb_set_cell_ex` | `lt_set_cell_ex` | [x] | [x] | Writes a grapheme cluster (base + trailing combining/joined codepoints) into one cell. Shared (`src/shared/cell.c` + cluster table `src/shared/egc.c`): the base stays in `ch`, the trailing codepoints are interned to a content-deduped id kept in `_reserved` (so the 16-byte SIMD diff invariant holds — equal id ⇔ equal cluster). Renderer emits base + continuation codepoints. Tested in `tests/test_egc.c` |
+| `tb_extend_cell` | `lt_extend_cell` | [x] | [x] | Appends one codepoint to the cluster in a cell (rebuilds + re-interns via `lt_set_cell_ex`). Cluster length capped at 16 codepoints. Tested in `tests/test_egc.c` |
 | `tb_get_cell` | `lt_get_cell` | [x] | [x] | Shared (`src/shared/cell.c`): copies the back-buffer cell at (x, y) into a caller `struct lt_cell` (value copy, not an internal pointer like termbox2). Bounds-checked; `LT_ERR_NOT_INIT` before init. Tested in `tests/test_get_cell.c` |
 
 ### Input
@@ -81,7 +81,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for **all 23** return codes (distinct messages + `"unknown error"` fallback); exhaustiveness + distinctness asserted in `tests/test_api.c` |
 | `tb_has_truecolor` | `lt_has_truecolor` | [ ] | [ ] | termbox2's is a compile-time flag; superseded for mode-selection by `lt_detect_color_depth` below |
 | *(libterm addition)* | `lt_detect_color_depth` | [x] | [x] | Stateless runtime query: inspects `$COLORTERM` (`truecolor`/`24bit`) then `$TERM` (`*256color*` substring) and returns the terminal's color ceiling as an `LT_OUTPUT_*` mode (truecolor/256/normal). Pure standard-C `getenv` in `src/shared/output.c` — no platform code, safe to call before `lt_init`. Byte-exact logic asserted by hermetic `setenv`-driven test `tests/test_detect_color_depth.c` (harness POSIX-only; the function itself is platform-agnostic) |
-| `tb_has_egc` | `lt_has_egc` | [ ] | [ ] | |
+| `tb_has_egc` | `lt_has_egc` | [x] | [x] | Returns 1 — grapheme-cluster support is always built in (no compile-time opt-out, unlike termbox2's `TB_OPT_EGC`) |
 | `tb_attr_width` | `lt_attr_width` | [ ] | [ ] | |
 | `tb_version` | `lt_version` | [x] | [x] | Returns `"0.1.0"` |
 | `tb_iswprint` | `lt_iswprint` | [x] | [x] | Shared; non-zero when `lt_wcwidth(ch) >= 0`. Tested in `tests/test_wcwidth.c` |
@@ -186,7 +186,7 @@ Not declared. Dependent on `lt_set_func`.
 |---|---|---|
 | `uintattr_t` | `lt_attr` (`uint32_t`) | declared and used everywhere; layout: color bits 0-23, attribute bits 24-30, `LT_HI_BLACK` bit 31 |
 | *(termbox2 uses `uint32_t` directly)* | `lt_uchar` (`uint32_t`) | libterm-internal alias for codepoints |
-| `struct tb_cell` | `struct lt_cell` (`ch`, `fg`, `bg`) | declared; termbox2's optional `ech`/`nech`/`cech` (EGC) fields not present |
+| `struct tb_cell` | `struct lt_cell` (`ch`, `fg`, `bg`, `_reserved`) | Fixed 16 bytes (SIMD-aligned). EGC is handled differently from termbox2: instead of per-cell `ech`/`nech`/`cech` heap pointers, `_reserved` doubles as a grapheme-cluster id into an out-of-line content-deduped table (`src/shared/egc.c`), keeping the cell POD and the byte-equality diff intact |
 | `struct tb_event` | `struct lt_event` (`type`, `mod`, `key`, `ch`, `w`, `h`, `x`, `y`) | declared; matches termbox2 layout |
 
 ---
@@ -226,7 +226,7 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 1. ~~**Windows SGR/color emission.**~~ **Resolved.** SGR emission was extracted into the shared `src/shared/sgr.c` (`lt__emit_sgr` / `lt__render_run`); both platforms now run it. Colors were visually confirmed in Windows Terminal (bench SGR workloads, real `WriteFile` output) and are guarded by an automated Windows byte test (`tests/test_win_sgr_output.c`) alongside the POSIX pty test.
 2. **POSIX modifier semantics are partial.** CSI modifier suffixes are mapped for the escape-key families, and the modern CSI-u encoding (`\x1b[cp;mods u`, fixterms/kitty) is parsed so Ctrl/Shift/Alt+letter now arrive unambiguously where the terminal emits it. Legacy ambiguous cases (e.g. terminals that send bare control bytes without CSI-u) remain inherently lossy; behavior is not yet universal across every terminal.
 3. ~~**POSIX UTF-8 input semantics need parity hardening.**~~ **Resolved.** Multi-byte assembly + strict decode with `U+FFFD` fallback now resync correctly (no byte-swallowing on malformed input), covered end-to-end by a pty test (`tests/test_posix_input_utf8.c`) and decode boundary tests. Remaining input work is general cross-terminal escape-sequence coverage (poll/peek), not UTF-8.
-4. **Public API surface still trails termbox2 (now narrowly).** Remaining undeclared: `lt_init_file` / `lt_init_rwfd`, the grapheme-cluster set (`lt_set_cell_ex` / `lt_extend_cell` / `lt_has_egc`), `lt_set_func`, and a few trivial capability constants (`lt_attr_width`, `lt_has_truecolor` — the latter superseded by `lt_detect_color_depth`). `lt_init_fd`, the print/send helpers, `lt_get_cell`, `lt_get_fds`, `lt_last_errno`, and `lt_wcwidth`/`lt_iswprint` are all now implemented.
+4. **Public API surface now closely tracks termbox2.** Remaining undeclared: `lt_init_file` / `lt_init_rwfd`, `lt_set_func`, and two trivial capability constants (`lt_attr_width`, `lt_has_truecolor` — the latter superseded by `lt_detect_color_depth`). Everything else — `lt_init_fd`, print/send helpers, `lt_get_cell`, `lt_get_fds`, `lt_last_errno`, `lt_wcwidth`/`lt_iswprint`, and the grapheme-cluster set (`lt_set_cell_ex` / `lt_extend_cell` / `lt_has_egc`) — is implemented.
 5. **Output-mode parity now shares one code path.** Both platforms consume `lt_set_output_mode` through the shared `lt__emit_sgr`, so the previous POSIX-only / Windows-stores-only skew is gone; remaining work is the Windows verification noted in blocker #1.
 
 ---

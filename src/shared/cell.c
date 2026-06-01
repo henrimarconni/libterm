@@ -33,6 +33,67 @@ int lt_get_cell(int x, int y, struct lt_cell *out) {
   return LT_OK;
 }
 
+int lt_set_cell_ex(int x, int y, const lt_uchar *chs, size_t nch, lt_attr fg,
+                   lt_attr bg) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+  if (!chs || nch == 0)
+    return LT_ERR;
+
+  if (!lt__g.back || x < 0 || y < 0 || x >= lt__g.width || y >= lt__g.height)
+    return LT_ERR_OUT_OF_BOUNDS;
+
+  /* Intern the trailing codepoints; a single-codepoint cluster gets id 0 and
+   * behaves exactly like lt_set_cell. */
+  bool ok = true;
+  uint32_t id = lt__egc_intern(chs, nch, &ok);
+  if (!ok)
+    return LT_ERR_MEM;
+
+  lt__g.dirty_rows[y] = true;
+
+  const size_t idx = (size_t)(y * lt__g.width + x);
+  lt__g.back[idx].ch = chs[0]; /* base codepoint stays in ch */
+  lt__g.back[idx].fg = fg;
+  lt__g.back[idx].bg = bg;
+  lt__g.back[idx]._reserved = id;
+
+  return LT_OK;
+}
+
+int lt_extend_cell(int x, int y, lt_uchar ch) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+
+  if (!lt__g.back || x < 0 || y < 0 || x >= lt__g.width || y >= lt__g.height)
+    return LT_ERR_OUT_OF_BOUNDS;
+
+  const size_t idx = (size_t)(y * lt__g.width + x);
+  const struct lt_cell *c = &lt__g.back[idx];
+
+  /* Rebuild the cluster = existing (base + any prior cluster codepoints) + ch,
+   * then re-intern. Cap the assembled length to a sane bound. */
+  lt_uchar buf[16];
+  size_t n = 0;
+
+  size_t prev_n = 0;
+  const lt_uchar *prev = lt__egc_get(c->_reserved, &prev_n);
+  if (prev) {
+    for (; n < prev_n && n < sizeof(buf) / sizeof(buf[0]) - 1; n++)
+      buf[n] = prev[n];
+  } else {
+    buf[n++] = c->ch; /* current cell is a plain codepoint; that is the base */
+  }
+
+  if (n >= sizeof(buf) / sizeof(buf[0]))
+    return LT_ERR; /* cluster too long to extend further */
+  buf[n++] = ch;
+
+  return lt_set_cell_ex(x, y, buf, n, c->fg, c->bg);
+}
+
+int lt_has_egc(void) { return 1; }
+
 int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
                 const char *str) {
   if (!lt__g.initialized)

@@ -2,6 +2,7 @@ set(LIBTERM_SHARED_SOURCES
     shared/api.c
     shared/buffer.c
     shared/cell.c
+    shared/egc.c
     shared/errors.c
     shared/input.c
     shared/output.c
