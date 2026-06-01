@@ -105,6 +105,10 @@ int lt__plat_shutdown(void) {
 
   if (lt__posix_tty_fd >= 0) {
     (void)lt__plat_show_cursor();
+    /* Unconditionally disable mouse reporting; harmless if it was never on,
+     * and prevents the shell inheriting mouse reports after we exit. */
+    static const char disable_mouse[] = "\x1b[?1006l\x1b[?1000l";
+    (void)lt__plat_write(disable_mouse, sizeof(disable_mouse) - 1);
     static const char leave_alt[] = "\x1b[?1049l";
     (void)lt__plat_write(leave_alt, sizeof(leave_alt) - 1);
     (void)lt__plat_flush();

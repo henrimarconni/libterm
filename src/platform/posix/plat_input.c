@@ -321,9 +321,96 @@ static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
   return LT_OK;
 }
 
+/* Parse an SGR (1006) mouse report: ESC [ < Cb ; Cx ; Cy (M|m), where Cb is the
+ * button code and Cx/Cy are 1-based column/row. Fills ev (type LT_EVENT_MOUSE,
+ * key = LT_KEY_MOUSE_*, x/y 0-based, mod from the Cb modifier bits) and returns
+ * true on a well-formed report; returns false (leaving ev untouched) otherwise,
+ * so the caller can fall through to the key paths. Mirrors termbox2's TYPE_1006
+ * branch (termbox2.h:3690-3755). */
+static bool lt__posix_parse_mouse_sgr(const unsigned char *seq, size_t seq_len,
+                                      struct lt_event *ev) {
+  /* Shortest valid report is ESC [ < 0 ; 0 ; 0 M = 9 bytes. */
+  if (seq_len < 9 || seq[1] != '[' || seq[2] != '<')
+    return false;
+
+  unsigned char final = seq[seq_len - 1];
+  if (final != 'M' && final != 'm')
+    return false;
+
+  int num[3] = {0, 0, 0};
+  int num_i = 0;
+  bool seen_digit = false;
+
+  for (size_t i = 3; i < seq_len - 1; i++) {
+    unsigned char c = seq[i];
+    if (c >= '0' && c <= '9') {
+      /* Cap accumulation well below INT_MAX: a malformed report with enough
+       * digits would otherwise overflow (signed overflow is UB). Any value
+       * past this ceiling is already meaningless for a button code or screen
+       * coordinate, so saturating is the right behavior, not just safe. */
+      if (num[num_i] < 1000000)
+        num[num_i] = num[num_i] * 10 + (c - '0');
+      seen_digit = true;
+    } else if (c == ';') {
+      if (!seen_digit || num_i >= 2)
+        return false;
+      num_i++;
+      seen_digit = false;
+    } else {
+      return false;
+    }
+  }
+
+  /* Need exactly three fields, the last one non-empty. */
+  if (num_i != 2 || !seen_digit)
+    return false;
+
+  int cb = num[0];
+
+  /* Low two bits select the button; bit 6 (64) promotes 0/1 to wheel up/down. */
+  switch (cb & 3) {
+  case 0:
+    ev->key = (cb & 64) ? LT_KEY_MOUSE_WHEEL_UP : LT_KEY_MOUSE_LEFT;
+    break;
+  case 1:
+    ev->key = (cb & 64) ? LT_KEY_MOUSE_WHEEL_DOWN : LT_KEY_MOUSE_MIDDLE;
+    break;
+  case 2:
+    ev->key = LT_KEY_MOUSE_RIGHT;
+    break;
+  default: /* 3 */
+    ev->key = LT_KEY_MOUSE_RELEASE;
+    break;
+  }
+
+  /* A lowercase 'm' final is xterm's button-release marker. */
+  if (final == 'm')
+    ev->key = LT_KEY_MOUSE_RELEASE;
+
+  /* Modifier bits: shift=4, alt=8, ctrl=16; motion=32 (drag). */
+  ev->mod = 0;
+  if (cb & 4)
+    ev->mod |= LT_MOD_SHIFT;
+  if (cb & 8)
+    ev->mod |= LT_MOD_ALT;
+  if (cb & 16)
+    ev->mod |= LT_MOD_CTRL;
+  if (cb & 32)
+    ev->mod |= LT_MOD_MOTION;
+
+  /* Reports are 1-based; clamp to 0 so a stray 0 coordinate can't go negative. */
+  ev->x = num[1] > 0 ? num[1] - 1 : 0;
+  ev->y = num[2] > 0 ? num[2] - 1 : 0;
+  ev->type = LT_EVENT_MOUSE;
+  return true;
+}
+
 static unsigned int lt__posix_parse_esc_seq(const unsigned char *seq,
                                             size_t seq_len,
                                             struct lt_event *ev) {
+
+  if (lt__posix_parse_mouse_sgr(seq, seq_len, ev))
+    return LT_OK;
 
   if (seq_len == 3 && seq[1] == '[') {
     lt__posix_parse_csi_final_key(seq[2], ev);
@@ -433,7 +520,9 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
     if (n > 0) {
       if (ch == '\x1b') {
-        unsigned char seq[8] = {'\x1b', 0, 0, 0, 0, 0, 0, 0};
+        /* Large enough for an SGR mouse report (ESC[<Cb;Cx;Cy M, up to ~16 B
+         * with 3-digit coords) as well as the shorter CSI/SS3 key sequences. */
+        unsigned char seq[32] = {'\x1b'};
         size_t seq_len = lt__posix_read_esc_tail(seq, sizeof(seq));
 
         ev->type = LT_EVENT_KEY;

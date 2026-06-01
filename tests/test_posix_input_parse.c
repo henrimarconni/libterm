@@ -34,6 +34,111 @@ static void expect_no_key(const unsigned char *seq, size_t len) {
   assert(ev.key == 0);
 }
 
+/* SGR mouse report: assert the full event (type/key/x/y/mod) parsed from a
+ * raw \x1b[<...M|m byte sequence. */
+static void expect_mouse(const unsigned char *seq, size_t len, uint16_t want_key,
+                         int want_x, int want_y, uint8_t want_mod) {
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+
+  int rc = lt__posix_parse_esc_seq(seq, len, &ev);
+  assert(rc == LT_OK);
+  assert(ev.type == LT_EVENT_MOUSE);
+  assert(ev.key == want_key);
+  assert(ev.x == want_x);
+  assert(ev.y == want_y);
+  assert(ev.mod == want_mod);
+}
+
+/* A sequence the mouse parser must reject (malformed / not 1006). It should
+ * leave type != LT_EVENT_MOUSE so the key paths can claim it. */
+static void expect_not_mouse(const unsigned char *seq, size_t len) {
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  ev.type = LT_EVENT_KEY;
+
+  int rc = lt__posix_parse_esc_seq(seq, len, &ev);
+  assert(rc == LT_OK);
+  assert(ev.type != LT_EVENT_MOUSE);
+}
+
+static void run_mouse_sgr(void) {
+  /* Left press at col 12, row 5 (1-based wire -> 0-based event). */
+  {
+    const unsigned char s[] = "\x1b[<0;12;5M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_LEFT, 11, 4, 0);
+  }
+  /* Lowercase 'm' is release regardless of button code. */
+  {
+    const unsigned char s[] = "\x1b[<0;12;5m";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_RELEASE, 11, 4, 0);
+  }
+  /* Middle (1) and right (2) buttons. */
+  {
+    const unsigned char s[] = "\x1b[<1;3;4M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_MIDDLE, 2, 3, 0);
+  }
+  {
+    const unsigned char s[] = "\x1b[<2;3;4M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_RIGHT, 2, 3, 0);
+  }
+  /* Wheel up (64) / down (65): bit 6 set promotes button 0/1 to wheel. */
+  {
+    const unsigned char s[] = "\x1b[<64;1;1M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_WHEEL_UP, 0, 0, 0);
+  }
+  {
+    const unsigned char s[] = "\x1b[<65;1;1M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_WHEEL_DOWN, 0, 0, 0);
+  }
+  /* Ctrl+left: button 0 | ctrl bit 16 = 16. */
+  {
+    const unsigned char s[] = "\x1b[<16;7;8M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_LEFT, 6, 7, LT_MOD_CTRL);
+  }
+  /* Shift+Alt+left: 0 | 4 | 8 = 12. */
+  {
+    const unsigned char s[] = "\x1b[<12;7;8M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_LEFT, 6, 7,
+                 LT_MOD_SHIFT | LT_MOD_ALT);
+  }
+  /* Drag (motion bit 32) with left held: 0 | 32 = 32. */
+  {
+    const unsigned char s[] = "\x1b[<32;2;2M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_LEFT, 1, 1, LT_MOD_MOTION);
+  }
+  /* Three-digit coordinates (the old 8-byte buffer could not hold these). */
+  {
+    const unsigned char s[] = "\x1b[<0;223;223M";
+    expect_mouse(s, sizeof(s) - 1, LT_KEY_MOUSE_LEFT, 222, 222, 0);
+  }
+
+  /* Negatives: missing final, missing a field, non-1006 CSI, and the legacy
+   * X10 'M' form must all be rejected by the mouse parser. */
+  {
+    const unsigned char s[] = "\x1b[<0;12;5"; /* no final M/m */
+    expect_not_mouse(s, sizeof(s) - 1);
+  }
+  {
+    const unsigned char s[] = "\x1b[<0;12M"; /* only two fields */
+    expect_not_mouse(s, sizeof(s) - 1);
+  }
+  {
+    const unsigned char s[] = "\x1b[A"; /* arrow-up, not a mouse report */
+    expect_not_mouse(s, sizeof(s) - 1);
+  }
+  /* Overflow guard: a field with far more digits than INT_MAX must not trigger
+   * signed-integer overflow (UB). It still parses as a mouse event (saturated),
+   * which is fine — the point is that it must not invoke UB. */
+  {
+    const unsigned char s[] = "\x1b[<99999999999999999999;1;1M";
+    struct lt_event ev;
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+    assert(ev.type == LT_EVENT_MOUSE);
+  }
+}
+
 struct mod_case {
   unsigned char digit;
   uint8_t want_mod;
@@ -314,5 +419,6 @@ int main(void) {
   run_ctrl_byte_keys();
   run_input_mode_alt();
   run_input_mode_esc();
+  run_mouse_sgr();
   return 0;
 }
