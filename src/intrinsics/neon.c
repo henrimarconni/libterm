@@ -43,7 +43,8 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
     eq = vceqq_u8(va, vb);
     mask = lt__neon_movemask(eq);
     if (mask != 0xFFFFFFFFFFFFFFFFull) {
-      /* each byte became a 4-bit nibble; first differing byte at lane = ctz / 4 */
+      /* each byte became a 4-bit nibble; first differing byte at lane = ctz / 4
+       */
       uint64_t diff = ~mask;
       size_t lane = (size_t)lt__ctz64(diff) >> 2; /* /4 */
       size_t byte_idx = i + lane;
@@ -60,10 +61,11 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 }
 
 /* NEON first-equal: a 128-bit vector is exactly one 16-byte cell. The cell is
- * equal iff all 16 byte-compares are true, i.e. the nibble movemask is all-ones.
- * The 16-byte compare includes _reserved (the cluster id), which is exactly
- * what cell-equality requires: two cells render the same iff ch/fg/bg AND
- * cluster match (ids are content-deduped, so equal id <=> equal cluster). */
+ * equal iff all 16 byte-compares are true, i.e. the nibble movemask is
+ * all-ones. The 16-byte compare includes _reserved (the cluster id), which is
+ * exactly what cell-equality requires: two cells render the same iff ch/fg/bg
+ * AND cluster match (ids are content-deduped, so equal id <=> equal cluster).
+ */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)

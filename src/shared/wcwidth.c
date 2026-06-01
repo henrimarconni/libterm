@@ -2,9 +2,10 @@
  * libterm - character display width.
  *
  * Returns the number of terminal columns a Unicode codepoint occupies, after
- * Markus Kuhn's reference wcwidth (https://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c,
- * public domain). The combining-mark table is a sorted list of inclusive ranges
- * searched by bisection; everything else is decided by a few wide-range tests.
+ * Markus Kuhn's reference wcwidth
+ * (https://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c, public domain). The
+ * combining-mark table is a sorted list of inclusive ranges searched by
+ * bisection; everything else is decided by a few wide-range tests.
  *
  * Width is not locale-dependent here: we always treat the codepoint as its
  * intrinsic East-Asian width (ambiguous-width characters count as 1), which
@@ -133,12 +134,12 @@ static int lt__is_wide(lt_uchar ch) {
           (ch <= 0x115F || /* Hangul Jamo init. consonants */
            ch == 0x2329 || ch == 0x232A ||
            (ch >= 0x2E80 && ch <= 0xA4CF && ch != 0x303F) || /* CJK..Yi */
-           (ch >= 0xAC00 && ch <= 0xD7A3) ||  /* Hangul Syllables */
-           (ch >= 0xF900 && ch <= 0xFAFF) ||  /* CJK Compat Ideographs */
-           (ch >= 0xFE10 && ch <= 0xFE19) ||  /* Vertical forms */
-           (ch >= 0xFE30 && ch <= 0xFE6F) ||  /* CJK Compat Forms */
-           (ch >= 0xFF00 && ch <= 0xFF60) ||  /* Fullwidth Forms */
-           (ch >= 0xFFE0 && ch <= 0xFFE6) ||  /* Fullwidth signs */
+           (ch >= 0xAC00 && ch <= 0xD7A3) ||   /* Hangul Syllables */
+           (ch >= 0xF900 && ch <= 0xFAFF) ||   /* CJK Compat Ideographs */
+           (ch >= 0xFE10 && ch <= 0xFE19) ||   /* Vertical forms */
+           (ch >= 0xFE30 && ch <= 0xFE6F) ||   /* CJK Compat Forms */
+           (ch >= 0xFF00 && ch <= 0xFF60) ||   /* Fullwidth Forms */
+           (ch >= 0xFFE0 && ch <= 0xFFE6) ||   /* Fullwidth signs */
            (ch >= 0x1F300 && ch <= 0x1F64F) || /* Misc symbols + emoticons */
            (ch >= 0x1F900 && ch <= 0x1F9FF) || /* Supplemental symbols */
            (ch >= 0x20000 && ch <= 0x3FFFD))); /* CJK Ext B..plane 3 */

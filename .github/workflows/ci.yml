@@ -16,17 +16,14 @@ permissions:
 
 jobs:
   # --------------------------------------------------------------------------
-  # Formatting check (advisory). The repo's .clang-format uses `Language: C`,
-  # which only clang-format >=22 can parse (19/20/21 reject it), so we pin the
-  # wheel to 22. The current tree has pre-existing drift from that config, so
-  # this job is non-blocking (continue-on-error) — it reports diffs without
-  # failing CI. Flip continue-on-error to false after a one-time `clang-format
-  # -i` reformat of the tree.
+  # Formatting check. The repo's .clang-format uses `Language: C`, which only
+  # clang-format >=22 can parse (19/20/21 reject it), so we pin the wheel to 22.
+  # The tree is kept formatted to this exact version; run `clang-format -i` with
+  # clang-format 22 before pushing if this fails.
   # --------------------------------------------------------------------------
   format:
     name: clang-format
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

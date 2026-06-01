@@ -91,9 +91,8 @@ void lt__simd_fill_cells(struct lt_cell *buf, int count, lt_attr fg,
     while (idx < (size_t)count) {
       size_t vl = __riscv_vsetvl_e32m1((size_t)count - idx);
       vuint32m1_t vv = __riscv_vmv_v_x_u32m1(fields[f], vl);
-      uint32_t *base = (uint32_t *)((char *)buf
-                                    + idx * sizeof(struct lt_cell)
-                                    + (size_t)f * sizeof(uint32_t));
+      uint32_t *base = (uint32_t *)((char *)buf + idx * sizeof(struct lt_cell) +
+                                    (size_t)f * sizeof(uint32_t));
       __riscv_vsse32_v_u32m1(base, (ptrdiff_t)sizeof(struct lt_cell), vv, vl);
       idx += vl;
     }

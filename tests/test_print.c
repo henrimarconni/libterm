@@ -38,11 +38,14 @@ int main(void) {
   assert(cell_fg(2, 1) == (lt_attr)LT_RED);
 
   /* Multi-byte UTF-8 decodes to one codepoint in one cell. */
-  assert(lt_print(0, 2, LT_DEFAULT, LT_DEFAULT, "\xE2\x82\xAC") == LT_OK); /* € */
+  assert(lt_print(0, 2, LT_DEFAULT, LT_DEFAULT, "\xE2\x82\xAC") ==
+         LT_OK); /* € */
   assert(cell_ch(0, 2) == 0x20AC);
 
   /* Malformed UTF-8 becomes U+FFFD and we resync to the trailing ASCII. */
-  assert(lt_print(0, 3, LT_DEFAULT, LT_DEFAULT, "\xC3" "Z") == LT_OK);
+  assert(lt_print(0, 3, LT_DEFAULT, LT_DEFAULT,
+                  "\xC3"
+                  "Z") == LT_OK);
   assert(cell_ch(0, 3) == 0xFFFD);
   assert(cell_ch(1, 3) == 'Z');
 
@@ -98,8 +101,8 @@ int main(void) {
    * "e" + U+0301 then "Z" -> 'e' at col 0, 'Z' at col 1. */
   {
     size_t w = 0;
-    assert(lt_print_ex(0, 11, LT_DEFAULT, LT_DEFAULT, &w,
-                       "e\xCC\x81Z") == LT_OK);
+    assert(lt_print_ex(0, 11, LT_DEFAULT, LT_DEFAULT, &w, "e\xCC\x81Z") ==
+           LT_OK);
     assert(cell_ch(0, 11) == 'e');
     assert(cell_ch(1, 11) == 'Z');
     assert(w == 2);

@@ -48,7 +48,8 @@ int main(void) {
     memset(&ev, 0, sizeof ev);
     int rc = lt_peek_event(&ev, 2000);
     if (rc == LT_ERR_NO_EVENT)
-      return 77; /* some CI ptys don't propagate SIGWINCH; skip rather than fail */
+      return 77; /* some CI ptys don't propagate SIGWINCH; skip rather than fail
+                  */
     assert(rc == LT_OK);
     assert(ev.type == LT_EVENT_RESIZE);
     assert(ev.w == 100);

@@ -13,7 +13,8 @@
 static char g_buf[65536];
 static size_t g_len = 0;
 
-/* Drain everything currently readable on the (non-blocking) master into g_buf. */
+/* Drain everything currently readable on the (non-blocking) master into g_buf.
+ */
 static void drain(int master) {
   for (;;) {
     char tmp[4096];
@@ -85,7 +86,8 @@ int main(void) {
   drain(master);
   assert(contains("38;5;200"));
 
-  /* truecolor: 0xFF8000 -> 38;2;255;128;0 (raw hex; LT_RGB checked in Task 2) */
+  /* truecolor: 0xFF8000 -> 38;2;255;128;0 (raw hex; LT_RGB checked in Task 2)
+   */
   lt_set_output_mode(LT_OUTPUT_TRUECOLOR);
   g_len = 0;
   assert(lt_set_cell(3, 0, 'T', 0xFF8000, LT_DEFAULT) == LT_OK);
@@ -100,10 +102,12 @@ int main(void) {
      whose fg repeats the previous cell's fg emits NO color bytes and its
      isolated frame would miss the payload. Every phase below therefore uses an
      fg value distinct from the immediately-preceding cell:
-       x3 (Task 1) 0xFF8000 -> x4 0x0A141E -> x5 0x80000000 -> x6 0 -> x7 0x80000000
-     (x5 and x7 share 0x80000000 but are separated by x6=0, so each re-emits). */
+       x3 (Task 1) 0xFF8000 -> x4 0x0A141E -> x5 0x80000000 -> x6 0 -> x7
+     0x80000000 (x5 and x7 share 0x80000000 but are separated by x6=0, so each
+     re-emits). */
 
-  /* LT_RGB packs a distinct 24-bit value -> 38;2;10;20;30 (validates the macro) */
+  /* LT_RGB packs a distinct 24-bit value -> 38;2;10;20;30 (validates the macro)
+   */
   g_len = 0;
   assert(lt_set_cell(4, 0, 't', LT_RGB(10, 20, 30), LT_DEFAULT) == LT_OK);
   assert(lt_present() == LT_OK);

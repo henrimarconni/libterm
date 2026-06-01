@@ -55,7 +55,8 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
  * its 16 movemask bits are all set. The 16-byte compare includes _reserved
  * (the cluster id), which is exactly what cell-equality requires: two cells
  * render the same iff ch/fg/bg AND cluster match (ids are content-deduped, so
- * equal id <=> equal cluster). The scalar tail below compares the same fields. */
+ * equal id <=> equal cluster). The scalar tail below compares the same fields.
+ */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)
@@ -81,7 +82,8 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
 
   int i = pairs * 2;
   if (i < count) {
-    /* Include _reserved (cluster id) to match the byte-wise vector path above. */
+    /* Include _reserved (cluster id) to match the byte-wise vector path above.
+     */
     if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg &&
         a[i]._reserved == b[i]._reserved)
       return i;

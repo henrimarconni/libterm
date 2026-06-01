@@ -77,8 +77,7 @@ int main(void) {
    * ESC followed by a stray '[A'. This is the core regression. */
   {
     const unsigned char s[] = {'\x1b', '[', 'A'};
-    expect_event(slave, master, s, sizeof s, 1, LT_EVENT_KEY,
-                 LT_KEY_ARROW_UP);
+    expect_event(slave, master, s, sizeof s, 1, LT_EVENT_KEY, LT_KEY_ARROW_UP);
   }
 
   /* A longer CSI sequence (F5 = ESC [ 1 5 ~) split mid-parameters. */

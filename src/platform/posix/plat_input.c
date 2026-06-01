@@ -35,7 +35,8 @@ static int lt__accum_digit(int acc, unsigned char digit) {
  * following reads. Two producers stash here: LT_INPUT_ESC (an unrecognized
  * ESC-prefixed combo emits LT_KEY_ESC, then the trailing byte) and the UTF-8
  * assembler (a stray non-continuation byte, instead of swallowing it). The
- * consumer, lt__posix_pending_pop, sits lower down next to where it is drained. */
+ * consumer, lt__posix_pending_pop, sits lower down next to where it is drained.
+ */
 static unsigned char lt__posix_pending[8];
 static size_t lt__posix_pending_len = 0;
 static size_t lt__posix_pending_pos = 0;
@@ -83,7 +84,8 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
 
     /* A byte that isn't a UTF-8 continuation (10xxxxxx) does not belong to this
      * sequence. Stash it for re-delivery as its own event and stop, so the
-     * partial sequence decodes to U+FFFD without swallowing the next keypress. */
+     * partial sequence decodes to U+FFFD without swallowing the next keypress.
+     */
     if ((buf[len] & 0xC0) != 0x80) {
       unsigned char stray = buf[len];
       lt__posix_pending_push(&stray, 1);
@@ -407,7 +409,8 @@ static bool lt__posix_parse_mouse_sgr(const unsigned char *seq, size_t seq_len,
 
   int cb = num[0];
 
-  /* Low two bits select the button; bit 6 (64) promotes 0/1 to wheel up/down. */
+  /* Low two bits select the button; bit 6 (64) promotes 0/1 to wheel up/down.
+   */
   switch (cb & 3) {
   case 0:
     ev->key = (cb & 64) ? LT_KEY_MOUSE_WHEEL_UP : LT_KEY_MOUSE_LEFT;
@@ -438,7 +441,8 @@ static bool lt__posix_parse_mouse_sgr(const unsigned char *seq, size_t seq_len,
   if (cb & 32)
     ev->mod |= LT_MOD_MOTION;
 
-  /* Reports are 1-based; clamp to 0 so a stray 0 coordinate can't go negative. */
+  /* Reports are 1-based; clamp to 0 so a stray 0 coordinate can't go negative.
+   */
   ev->x = num[1] > 0 ? num[1] - 1 : 0;
   ev->y = num[2] > 0 ? num[2] - 1 : 0;
   ev->type = LT_EVENT_MOUSE;
@@ -474,7 +478,8 @@ static bool lt__posix_parse_csi_u(const unsigned char *seq, size_t seq_len,
     } else if (c == ';' && !in_mod) {
       in_mod = true;
     } else {
-      return false; /* anything else (incl. a second ';' sub-field) -> not CSI-u */
+      return false; /* anything else (incl. a second ';' sub-field) -> not CSI-u
+                     */
     }
   }
 

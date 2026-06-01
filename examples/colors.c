@@ -21,8 +21,8 @@ int main(void) {
 
   lt_hide_cursor();
 
-  puts_at(2, 1, "libterm color demo (press q or Esc to quit)",
-          LT_DEFAULT, LT_DEFAULT);
+  puts_at(2, 1, "libterm color demo (press q or Esc to quit)", LT_DEFAULT,
+          LT_DEFAULT);
 
   const char *names[8] = {"BLACK", "RED",     "GREEN", "YELLOW",
                           "BLUE",  "MAGENTA", "CYAN",  "WHITE"};
@@ -34,12 +34,12 @@ int main(void) {
     puts_at(12, 3 + i, names[i], LT_DEFAULT, colors[i]);
   }
 
-  puts_at(2, 12, "bold",      LT_RED   | LT_BOLD,      LT_DEFAULT);
+  puts_at(2, 12, "bold", LT_RED | LT_BOLD, LT_DEFAULT);
   puts_at(2, 13, "underline", LT_GREEN | LT_UNDERLINE, LT_DEFAULT);
-  puts_at(2, 14, "reverse",   LT_BLUE  | LT_REVERSE,   LT_DEFAULT);
-  puts_at(2, 15, "italic",    LT_CYAN  | LT_ITALIC,    LT_DEFAULT);
-  puts_at(2, 16, "bold+underline",
-          LT_YELLOW | LT_BOLD | LT_UNDERLINE, LT_DEFAULT);
+  puts_at(2, 14, "reverse", LT_BLUE | LT_REVERSE, LT_DEFAULT);
+  puts_at(2, 15, "italic", LT_CYAN | LT_ITALIC, LT_DEFAULT);
+  puts_at(2, 16, "bold+underline", LT_YELLOW | LT_BOLD | LT_UNDERLINE,
+          LT_DEFAULT);
 
   lt_present();
 
