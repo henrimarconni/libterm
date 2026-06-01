@@ -52,7 +52,8 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 
 /* RVV first-equal: one 16-byte cell per iteration. vsetvl(16) yields vl==16 for
  * VLEN >= 128 (the rv64gcv target). The cell is equal iff no byte differs, i.e.
- * vfirst over the not-equal mask is -1. Relies on the _reserved==0 invariant. */
+ * vfirst over the not-equal mask is -1. The 16-byte compare includes _reserved
+ * (the cluster id), which is what cell-equality requires. */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)

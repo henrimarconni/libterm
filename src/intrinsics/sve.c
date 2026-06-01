@@ -57,7 +57,8 @@ int lt__simd_diff_first_differ_cell(const struct lt_cell *a,
 /* SVE first-equal: one 16-byte cell per iteration using a 16-byte predicate.
  * The cell is equal iff no active lane differs. VLEN >= 128 bits is the SVE
  * architectural minimum, so a 16-byte predicate always fits in one vector.
- * Relies on the _reserved==0 invariant. */
+ * The 16-byte compare includes _reserved (the cluster id), which is what
+ * cell-equality requires (equal id <=> equal cluster, ids being deduped). */
 int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
                                    const struct lt_cell *b, int count) {
   if (count <= 0)
