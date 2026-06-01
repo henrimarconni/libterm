@@ -207,6 +207,47 @@ static void run_csi_u(void) {
     const unsigned char s[] = "\x1b[97;5;3u"; /* extra ';' field */
     expect_no_key(s, sizeof(s) - 1);
   }
+  /* Overflow guard: a digit run far past INT_MAX must not invoke signed-integer
+   * overflow (UB). It still parses as a key event (codepoint saturated); the
+   * point is that running this under UBSan must stay clean. Covers both the
+   * codepoint field and the modifier field. */
+  {
+    const unsigned char s[] = "\x1b[99999999999u";
+    struct lt_event ev;
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+    assert(ev.type == LT_EVENT_KEY);
+  }
+  {
+    const unsigned char s[] = "\x1b[1;99999999999u";
+    struct lt_event ev;
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+  }
+}
+
+/* Overflow guard for the other two CSI numeric parsers (tilde-key code/mod and
+ * letter-final modifier). Long digit runs must not overflow; UBSan-clean. */
+static void run_csi_overflow(void) {
+  struct lt_event ev;
+  /* tilde: huge code and huge modifier field. */
+  {
+    const unsigned char s[] = "\x1b[99999999999;99999999999~";
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+  }
+  /* letter-final: huge modifier on an arrow key. */
+  {
+    const unsigned char s[] = "\x1b[1;99999999999A";
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+  }
+  /* mouse SGR: huge button/coord fields. */
+  {
+    const unsigned char s[] = "\x1b[<99999999999;99999999999;99999999999M";
+    memset(&ev, 0, sizeof(ev));
+    assert(lt__posix_parse_esc_seq(s, sizeof(s) - 1, &ev) == LT_OK);
+  }
 }
 
 struct mod_case {
@@ -492,5 +533,6 @@ int main(void) {
   run_mouse_sgr();
   run_back_tab();
   run_csi_u();
+  run_csi_overflow();
   return 0;
 }

@@ -10,6 +10,16 @@ static int lt__present_abort(int err) {
   static const char sync_end[] = "\x1b[?2026l";
   (void)lt__plat_write(sync_end, sizeof(sync_end) - 1);
   (void)lt__plat_flush();
+
+  /* The frame was abandoned mid-emit (a tty write failed), so buffered SGR /
+   * glyph bytes were discarded and the terminal's real state no longer matches
+   * our caches. Invalidate both so the next present re-emits SGR from scratch
+   * and re-issues a cursor move rather than trusting stale positions. */
+  lt__g.cur_fg = 0xFFFFFFFF;
+  lt__g.cur_bg = 0xFFFFFFFF;
+  lt__g.cur_attrs = 0xFFFFFFFF;
+  lt__g.cur_x = -1;
+  lt__g.cur_y = -1;
   return err;
 }
 
@@ -164,13 +174,16 @@ int lt_invalidate(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
 
-  /* Force a full repaint on the next present. Also invalidate the SGR cache so
-   * the first run re-emits its colors/attrs from scratch (the terminal's actual
-   * SGR state is unknown after an out-of-band write). */
+  /* Force a full repaint on the next present. Also invalidate the SGR cache AND
+   * the cursor-position cache so the first run re-emits colors/attrs from
+   * scratch and re-issues a cursor move — after an out-of-band write (raw
+   * lt_send) the terminal's real SGR state AND cursor position are unknown. */
   lt__g.force_repaint = true;
   lt__g.cur_fg = 0xFFFFFFFF;
   lt__g.cur_bg = 0xFFFFFFFF;
   lt__g.cur_attrs = 0xFFFFFFFF;
+  lt__g.cur_x = -1;
+  lt__g.cur_y = -1;
   return LT_OK;
 }
 

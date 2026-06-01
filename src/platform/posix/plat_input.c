@@ -18,6 +18,19 @@
  * keypress costs at most this much latency before it resolves. */
 #define LT__ESC_SEQ_TIMEOUT_MS 50
 
+/* Saturating decimal accumulation for escape-sequence numeric fields. Inputs
+ * arrive from the terminal (untrusted), so a long run of digits must not
+ * overflow the int accumulator — signed overflow is undefined behavior. We cap
+ * well below INT_MAX; any value past this is already meaningless for a key
+ * code, coordinate, or modifier field, so saturating is correct, not just safe.
+ * (The SGR mouse parser open-codes the same guard.) */
+#define LT__CSI_NUM_CAP 1000000
+static int lt__accum_digit(int acc, unsigned char digit) {
+  if (acc < LT__CSI_NUM_CAP)
+    return acc * 10 + (digit - '0');
+  return acc;
+}
+
 /* Bytes pending re-delivery as standalone events, replayed one at a time on the
  * following reads. Two producers stash here: LT_INPUT_ESC (an unrecognized
  * ESC-prefixed combo emits LT_KEY_ESC, then the trailing byte) and the UTF-8
@@ -217,7 +230,7 @@ static int lt__posix_parse_csi_letter_mod(const unsigned char *seq,
       return 0;
 
     if (seen_semi)
-      mod_code = mod_code * 10 + (seq[i] - '0');
+      mod_code = lt__accum_digit(mod_code, seq[i]);
   }
 
   return seen_semi ? mod_code : 0;
@@ -241,9 +254,9 @@ static void lt__posix_parse_csi_tilde_key(const unsigned char *seq,
     }
 
     if (!in_modifier)
-      code = code * 10 + (seq[i] - '0');
+      code = lt__accum_digit(code, seq[i]);
     else
-      mod_code = mod_code * 10 + (seq[i] - '0');
+      mod_code = lt__accum_digit(mod_code, seq[i]);
   }
 
   ev->mod = lt__posix_parse_csi_mod(mod_code);
@@ -374,12 +387,9 @@ static bool lt__posix_parse_mouse_sgr(const unsigned char *seq, size_t seq_len,
   for (size_t i = 3; i < seq_len - 1; i++) {
     unsigned char c = seq[i];
     if (c >= '0' && c <= '9') {
-      /* Cap accumulation well below INT_MAX: a malformed report with enough
-       * digits would otherwise overflow (signed overflow is UB). Any value
-       * past this ceiling is already meaningless for a button code or screen
-       * coordinate, so saturating is the right behavior, not just safe. */
-      if (num[num_i] < 1000000)
-        num[num_i] = num[num_i] * 10 + (c - '0');
+      /* Saturating accumulation (see lt__accum_digit): untrusted digit runs
+       * must not overflow the int. */
+      num[num_i] = lt__accum_digit(num[num_i], c);
       seen_digit = true;
     } else if (c == ';') {
       if (!seen_digit || num_i >= 2)
@@ -456,9 +466,9 @@ static bool lt__posix_parse_csi_u(const unsigned char *seq, size_t seq_len,
     unsigned char c = seq[i];
     if (c >= '0' && c <= '9') {
       if (in_mod)
-        mod_field = mod_field * 10 + (c - '0');
+        mod_field = lt__accum_digit(mod_field, c);
       else {
-        code = code * 10 + (c - '0');
+        code = lt__accum_digit(code, c);
         seen_code = true;
       }
     } else if (c == ';' && !in_mod) {
