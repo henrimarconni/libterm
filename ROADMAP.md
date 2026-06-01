@@ -57,10 +57,10 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_print` | `lt_print` | [ ] | [ ] | |
-| `tb_print_ex` | `lt_print_ex` | [ ] | [ ] | |
-| `tb_printf` | `lt_printf` | [ ] | [ ] | |
-| `tb_printf_ex` | `lt_printf_ex` | [ ] | [ ] | |
+| `tb_print` | `lt_print` | [x] | [x] | Shared (`src/shared/cell.c`): UTF-8 string into the back buffer, one codepoint per cell, `\n` wraps to the start column of the next row, malformed UTF-8 → `U+FFFD`, off-buffer cells clipped. No wcwidth yet, so wide/combining chars occupy one cell |
+| `tb_print_ex` | `lt_print_ex` | [x] | [x] | As `lt_print`, with `out_w` = widest line's column count. Tested in `tests/test_print.c` |
+| `tb_printf` | `lt_printf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_print` |
+| `tb_printf_ex` | `lt_printf_ex` | [ ] | [ ] | Not declared (the `out_w` + printf variant); `lt_print_ex` + `lt_printf` cover the common cases |
 | `tb_send` | `lt_send` | [ ] | [ ] | |
 | `tb_sendf` | `lt_sendf` | [ ] | [ ] | |
 | `tb_set_func` | `lt_set_func` | [ ] | [ ] | Custom `extract_event` / `extract_pre` / `extract_post` hook |

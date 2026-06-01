@@ -227,6 +227,22 @@ LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
 
+/* ---- print helpers ---- */
+/* Write a UTF-8 string into the back buffer starting at (x, y), each cell in
+ * fg/bg. Each codepoint advances one column (libterm has no wcwidth yet, so
+ * wide and combining characters occupy a single cell). A '\n' moves to column
+ * x of the next row. Malformed UTF-8 becomes U+FFFD. Cells outside the buffer
+ * are clipped silently; only a starting (x, y) out of bounds returns
+ * LT_ERR_OUT_OF_BOUNDS. Returns LT_ERR_NOT_INIT before lt_init. */
+LT_API int lt_print(int x, int y, lt_attr fg, lt_attr bg, const char *str);
+/* As lt_print, but if out_w is non-NULL it receives the number of columns
+ * advanced on the widest line written. */
+LT_API int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
+                       const char *str);
+/* printf-style wrapper over lt_print. Formats into an internal fixed buffer
+ * (truncated if the result would exceed it), then prints the result. */
+LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...);
+
 /* ---- input ---- */
 /* Event reads return LT_OK with an event, or LT_ERR_NO_EVENT when none is
  * available (poll timeout / interrupted). On a genuine I/O failure they return
