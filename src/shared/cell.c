@@ -107,8 +107,8 @@ int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
     return LT_ERR_OUT_OF_BOUNDS;
 
   const int start_x = x;
-  size_t line_w = 0;  /* columns advanced on the current line */
-  size_t max_w = 0;   /* widest line seen */
+  size_t line_w = 0; /* columns advanced on the current line */
+  size_t max_w = 0;  /* widest line seen */
 
   while (*str) {
     int need = lt__utf8_char_length(*str);
@@ -145,7 +145,8 @@ int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
 
     int w = lt__wcwidth(cp);
     if (w < 0) {
-      /* Non-printable (control char etc.): show a replacement glyph, width 1. */
+      /* Non-printable (control char etc.): show a replacement glyph, width 1.
+       */
       cp = 0xFFFD;
       w = 1;
     }

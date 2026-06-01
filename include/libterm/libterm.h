@@ -86,8 +86,8 @@ extern "C" {
 #define LT_KEY_ARROW_RIGHT (0xFFFF - 21)
 #define LT_KEY_BACK_TAB (0xFFFF - 22) /* Shift+Tab, CSI Z; mirrors termbox2 */
 
-/* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE) ----
- * Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
+/* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE)
+ * ---- Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
 #define LT_KEY_MOUSE_LEFT (0xFFFF - 23)
 #define LT_KEY_MOUSE_RIGHT (0xFFFF - 24)
 #define LT_KEY_MOUSE_MIDDLE (0xFFFF - 25)
@@ -279,7 +279,8 @@ LT_API int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
                        const char *str);
 /* printf-style wrapper over lt_print. Formats into an internal fixed buffer
  * (truncated if the result would exceed it), then prints the result. */
-LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt, ...);
+LT_API int lt_printf(int x, int y, lt_attr fg, lt_attr bg, const char *fmt,
+                     ...);
 /* As lt_printf, but if out_w is non-NULL it receives the number of columns
  * advanced on the widest line written (see lt_print_ex). */
 LT_API int lt_printf_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,

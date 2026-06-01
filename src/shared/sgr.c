@@ -212,7 +212,8 @@ int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs) {
  * codepoints (combining marks / ZWJ joiners) the terminal composes onto it.
  * Used only for spans that contain a cluster; the cluster-free fast path in
  * lt__render_run stays byte-for-byte as it was. Reserves its own buffer per
- * cell since a cluster's byte length is unbounded by the 4-per-cell estimate. */
+ * cell since a cluster's byte length is unbounded by the 4-per-cell estimate.
+ */
 static int lt__render_cluster_cell(const struct lt_cell *c) {
   size_t ncl = 0;
   const lt_uchar *cl = lt__egc_get(c->_reserved, &ncl);

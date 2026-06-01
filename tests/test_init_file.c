@@ -42,7 +42,8 @@ int main(void) {
     close(slave);
     return 77; /* can't resolve the device path; skip */
   }
-  /* We don't need our own fd; lt_init_file opens the path itself (and owns it). */
+  /* We don't need our own fd; lt_init_file opens the path itself (and owns it).
+   */
   close(slave);
 
   assert(lt_init_file(name) == LT_OK);

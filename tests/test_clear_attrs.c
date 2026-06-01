@@ -43,8 +43,8 @@ int main(void) {
   assert(lt_clear() == LT_OK);
   {
     const int w = lt_width(), h = lt_height();
-    const int pts[][2] = {{0, 0}, {w - 1, 0}, {0, h - 1}, {w - 1, h - 1},
-                          {w / 2, h / 2}};
+    const int pts[][2] = {
+        {0, 0}, {w - 1, 0}, {0, h - 1}, {w - 1, h - 1}, {w / 2, h / 2}};
     for (size_t i = 0; i < sizeof pts / sizeof pts[0]; i++) {
       struct lt_cell c;
       assert(lt_get_cell(pts[i][0], pts[i][1], &c) == LT_OK);

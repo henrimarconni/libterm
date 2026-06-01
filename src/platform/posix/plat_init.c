@@ -48,7 +48,8 @@ int lt__plat_init_fd(int ttyfd, int owned) {
 
   int rc = LT_ERR_INIT_OPEN;
 
-  /* orig_tios not captured yet -> nothing to restore (goto fail, not fail_restore) */
+  /* orig_tios not captured yet -> nothing to restore (goto fail, not
+   * fail_restore) */
   if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0) {
     lt__g.last_errno = errno;
     goto fail;

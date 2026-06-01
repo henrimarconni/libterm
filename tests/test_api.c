@@ -5,17 +5,28 @@
 static void test_strerror(void) {
   /* every code returns a non-NULL, non-empty string */
   const int codes[] = {
-      LT_OK,                    LT_ERR,
-      LT_ERR_NEED_MORE,         LT_ERR_INIT_ALREADY,
-      LT_ERR_INIT_OPEN,         LT_ERR_MEM,
-      LT_ERR_NO_EVENT,          LT_ERR_NO_TERM,
-      LT_ERR_NOT_INIT,          LT_ERR_OUT_OF_BOUNDS,
-      LT_ERR_READ,              LT_ERR_RESIZE_IOCTL,
-      LT_ERR_RESIZE_PIPE,       LT_ERR_RESIZE_SIGACTION,
-      LT_ERR_POLL,              LT_ERR_TCGETATTR,
-      LT_ERR_TCSETATTR,         LT_ERR_UNSUPPORTED_TERM,
-      LT_ERR_RESIZE_WRITE,      LT_ERR_RESIZE_POLL,
-      LT_ERR_RESIZE_READ,       LT_ERR_RESIZE_SSCANF,
+      LT_OK,
+      LT_ERR,
+      LT_ERR_NEED_MORE,
+      LT_ERR_INIT_ALREADY,
+      LT_ERR_INIT_OPEN,
+      LT_ERR_MEM,
+      LT_ERR_NO_EVENT,
+      LT_ERR_NO_TERM,
+      LT_ERR_NOT_INIT,
+      LT_ERR_OUT_OF_BOUNDS,
+      LT_ERR_READ,
+      LT_ERR_RESIZE_IOCTL,
+      LT_ERR_RESIZE_PIPE,
+      LT_ERR_RESIZE_SIGACTION,
+      LT_ERR_POLL,
+      LT_ERR_TCGETATTR,
+      LT_ERR_TCSETATTR,
+      LT_ERR_UNSUPPORTED_TERM,
+      LT_ERR_RESIZE_WRITE,
+      LT_ERR_RESIZE_POLL,
+      LT_ERR_RESIZE_READ,
+      LT_ERR_RESIZE_SSCANF,
       LT_ERR_CAP_COLLISION,
   };
   const int n = (int)(sizeof codes / sizeof codes[0]);
@@ -143,10 +154,12 @@ int main(void) {
 
   /* set_cell bounds */
   assert(lt_set_cell(0, 0, 'A', LT_WHITE, LT_BLACK) == LT_OK);
-  assert(lt_set_cell(lt_width() - 1, lt_height() - 1, 'Z', LT_WHITE, LT_BLACK) ==
-         LT_OK);
-  assert(lt_set_cell(-1, 0, 'x', LT_DEFAULT, LT_DEFAULT) == LT_ERR_OUT_OF_BOUNDS);
-  assert(lt_set_cell(0, -1, 'x', LT_DEFAULT, LT_DEFAULT) == LT_ERR_OUT_OF_BOUNDS);
+  assert(lt_set_cell(lt_width() - 1, lt_height() - 1, 'Z', LT_WHITE,
+                     LT_BLACK) == LT_OK);
+  assert(lt_set_cell(-1, 0, 'x', LT_DEFAULT, LT_DEFAULT) ==
+         LT_ERR_OUT_OF_BOUNDS);
+  assert(lt_set_cell(0, -1, 'x', LT_DEFAULT, LT_DEFAULT) ==
+         LT_ERR_OUT_OF_BOUNDS);
   assert(lt_set_cell(lt_width(), 0, 'x', LT_DEFAULT, LT_DEFAULT) ==
          LT_ERR_OUT_OF_BOUNDS);
   assert(lt_set_cell(0, lt_height(), 'x', LT_DEFAULT, LT_DEFAULT) ==

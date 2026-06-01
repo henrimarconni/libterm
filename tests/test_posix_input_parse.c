@@ -36,8 +36,9 @@ static void expect_no_key(const unsigned char *seq, size_t len) {
 
 /* SGR mouse report: assert the full event (type/key/x/y/mod) parsed from a
  * raw \x1b[<...M|m byte sequence. */
-static void expect_mouse(const unsigned char *seq, size_t len, uint16_t want_key,
-                         int want_x, int want_y, uint8_t want_mod) {
+static void expect_mouse(const unsigned char *seq, size_t len,
+                         uint16_t want_key, int want_x, int want_y,
+                         uint8_t want_mod) {
   struct lt_event ev;
   memset(&ev, 0, sizeof(ev));
 
@@ -271,15 +272,15 @@ static void run_letter_mod_matrix(void) {
       {'8', LT_MOD_SHIFT | LT_MOD_ALT | LT_MOD_CTRL},
   };
   const struct letter_case keys[] = {
-      {'A', LT_KEY_ARROW_UP},   {'B', LT_KEY_ARROW_DOWN},
+      {'A', LT_KEY_ARROW_UP},    {'B', LT_KEY_ARROW_DOWN},
       {'C', LT_KEY_ARROW_RIGHT}, {'D', LT_KEY_ARROW_LEFT},
-      {'H', LT_KEY_HOME},       {'F', LT_KEY_END},
+      {'H', LT_KEY_HOME},        {'F', LT_KEY_END},
   };
 
   for (size_t k = 0; k < sizeof(keys) / sizeof(keys[0]); k++) {
     for (size_t m = 0; m < sizeof(mods) / sizeof(mods[0]); m++) {
-      const unsigned char s[] = {'\x1b', '[', '1', ';', mods[m].digit,
-                                 keys[k].final};
+      const unsigned char s[] = {'\x1b', '[',           '1',
+                                 ';',    mods[m].digit, keys[k].final};
       expect_seq(s, sizeof(s), keys[k].want_key, mods[m].want_mod);
     }
   }
@@ -288,9 +289,9 @@ static void run_letter_mod_matrix(void) {
 static void run_bare_letter_keys(void) {
   /* No modifier — ESC [ <final>. */
   const struct letter_case keys[] = {
-      {'A', LT_KEY_ARROW_UP},   {'B', LT_KEY_ARROW_DOWN},
+      {'A', LT_KEY_ARROW_UP},    {'B', LT_KEY_ARROW_DOWN},
       {'C', LT_KEY_ARROW_RIGHT}, {'D', LT_KEY_ARROW_LEFT},
-      {'H', LT_KEY_HOME},       {'F', LT_KEY_END},
+      {'H', LT_KEY_HOME},        {'F', LT_KEY_END},
   };
 
   for (size_t k = 0; k < sizeof(keys) / sizeof(keys[0]); k++) {

@@ -2,9 +2,9 @@
  * captures through an openpty() slave, which Windows lacks, and lt_init needs a
  * real console so it can't run headless. Instead we redirect STD_OUTPUT_HANDLE
  * to an anonymous pipe and drive the shared emission path directly
- * (lt__render_run -> lt__emit_sgr -> lt__plat_flush -> WriteFile), then read the
- * pipe and assert the mode-aware SGR payloads. This is the Windows-side guard
- * that the shared src/shared/sgr.c keeps emitting correct bytes.
+ * (lt__render_run -> lt__emit_sgr -> lt__plat_flush -> WriteFile), then read
+ * the pipe and assert the mode-aware SGR payloads. This is the Windows-side
+ * guard that the shared src/shared/sgr.c keeps emitting correct bytes.
  *
  * White-box: links libterm_static and calls lt__ internals (same pattern as
  * test_simd_diff). Forcing the SGR cache (cur_fg/cur_bg/cur_attrs) to the
@@ -134,7 +134,7 @@ int main(void) {
   assert(contains("48;2;0;0;0")); /* real black bg */
 
   emit(rd, LT_OUTPUT_TRUECOLOR, LT_DEFAULT, LT_DEFAULT);
-  assert(contains(";39;")); /* terminal-default fg */
+  assert(contains(";39;"));  /* terminal-default fg */
   assert(!contains("38;2")); /* and NOT an RGB sequence */
 
   SetStdHandle(STD_OUTPUT_HANDLE, saved);

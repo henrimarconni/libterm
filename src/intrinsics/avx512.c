@@ -2,8 +2,8 @@
  * src/intrinsics/avx512.c
  *
  * x86_64 AVX-512 implementation of the SIMD diff contract.
- * Compiled when LIBTERM_SIMD=avx512 (auto does NOT pick this — explicit opt-in).
- * Compile flags set per-TU in src/CMakeLists.txt:
+ * Compiled when LIBTERM_SIMD=avx512 (auto does NOT pick this — explicit
+ * opt-in). Compile flags set per-TU in src/CMakeLists.txt:
  *   - GCC/Clang: -mavx512f -mavx512bw
  *   - MSVC:      /arch:AVX512
  *
@@ -77,7 +77,8 @@ int lt__simd_diff_first_equal_cell(const struct lt_cell *a,
 
   /* tail: up to 3 cells, scalar */
   for (int i = groups * 4; i < count; i++) {
-    /* Include _reserved (cluster id) to match the byte-wise vector path above. */
+    /* Include _reserved (cluster id) to match the byte-wise vector path above.
+     */
     if (a[i].ch == b[i].ch && a[i].fg == b[i].fg && a[i].bg == b[i].bg &&
         a[i]._reserved == b[i]._reserved)
       return i;

@@ -32,8 +32,10 @@ int main(void) {
 
   assert(lt_set_cell(0, 0, 'A', LT_WHITE, LT_BLACK) == LT_OK);
   assert(lt_set_cell(79, 23, 'Z', LT_WHITE, LT_BLACK) == LT_OK);
-  assert(lt_set_cell(-1, 0, 'x', LT_DEFAULT, LT_DEFAULT) == LT_ERR_OUT_OF_BOUNDS);
-  assert(lt_set_cell(80, 0, 'x', LT_DEFAULT, LT_DEFAULT) == LT_ERR_OUT_OF_BOUNDS);
+  assert(lt_set_cell(-1, 0, 'x', LT_DEFAULT, LT_DEFAULT) ==
+         LT_ERR_OUT_OF_BOUNDS);
+  assert(lt_set_cell(80, 0, 'x', LT_DEFAULT, LT_DEFAULT) ==
+         LT_ERR_OUT_OF_BOUNDS);
   assert(lt_present() == LT_OK);
 
   /* no input fed yet: a zero-timeout peek reports no event */
