@@ -42,10 +42,10 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX now handles arrows, Home/End, Insert/Delete, PgUp/PgDn, F1–F12, CSI modifier forms, SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback; parity edge-cases across terminals still remain |
+| `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX now handles arrows, Home/End, Insert/Delete, PgUp/PgDn, F1–F12, CSI modifier forms, SGR (1006) mouse reports (button/wheel/coords/modifiers → `LT_EVENT_MOUSE`), SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback; parity edge-cases across terminals still remain |
 | `tb_peek_event` | `lt_peek_event` | [~] | [x] | Same caveats as `lt_poll_event` |
 | `tb_get_fds` | `lt_get_fds` | [ ] | [—] | Not declared |
-| `tb_set_input_mode` | `lt_set_input_mode` | [x] | [x] | `lt_init` defaults to `LT_INPUT_ESC`. POSIX honors the flag for Alt-combos (`ESC <byte>`): `LT_INPUT_ALT` → one event with `LT_MOD_ALT`; `LT_INPUT_ESC` → `LT_KEY_ESC` then the byte replayed (termbox2's two-event default). Windows always reports explicit modifier state (`MOD_ALT` from `dwControlKeyState`), i.e. always `LT_INPUT_ALT`-style — the ESC-prefix distinction is a POSIX-terminal concern. `LT_INPUT_MOUSE` is accepted but inert until mouse exists. POSIX behavior unit-tested in `tests/test_posix_input_parse.c` |
+| `tb_set_input_mode` | `lt_set_input_mode` | [x] | [x] | `lt_init` defaults to `LT_INPUT_ESC`. POSIX honors the flag for Alt-combos (`ESC <byte>`): `LT_INPUT_ALT` → one event with `LT_MOD_ALT`; `LT_INPUT_ESC` → `LT_KEY_ESC` then the byte replayed (termbox2's two-event default). Windows always reports explicit modifier state (`MOD_ALT` from `dwControlKeyState`), i.e. always `LT_INPUT_ALT`-style — the ESC-prefix distinction is a POSIX-terminal concern. `LT_INPUT_MOUSE` now emits the SGR (`?1000h`/`?1006h`) tracking-enable handshake on POSIX (disabled again on `lt_set_input_mode` clear and on `lt_shutdown`). POSIX behavior unit-tested in `tests/test_posix_input_parse.c` |
 
 ### Output mode
 
@@ -127,7 +127,7 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 |---|---|---|
 | `TB_EVENT_KEY` | `LT_EVENT_KEY` | declared, emitted (POSIX [~], Windows [x]) |
 | `TB_EVENT_RESIZE` | `LT_EVENT_RESIZE` | declared; emitted on both platforms (Windows console resize event, POSIX SIGWINCH/self-pipe path) |
-| `TB_EVENT_MOUSE` | `LT_EVENT_MOUSE` | declared; not emitted on either platform |
+| `TB_EVENT_MOUSE` | `LT_EVENT_MOUSE` | declared; emitted on POSIX (SGR 1006 reports → button in `key`, 0-based coords in `x`/`y`, modifiers in `mod`); not emitted on Windows |
 
 ### Keys (`TB_KEY_*` → `LT_KEY_*`)
 
@@ -148,7 +148,9 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | `TB_MOD_ALT` | `LT_MOD_ALT` | [ ] | [x] |
 | `TB_MOD_CTRL` | `LT_MOD_CTRL` | [ ] | [x] |
 | `TB_MOD_SHIFT` | `LT_MOD_SHIFT` | [ ] | [x] |
-| `TB_MOD_MOTION` | `LT_MOD_MOTION` | [ ] | [ ] |
+| `TB_MOD_MOTION` | `LT_MOD_MOTION` | [x] | [ ] |
+
+POSIX mouse reports set `LT_MOD_SHIFT`/`LT_MOD_CTRL`/`LT_MOD_ALT`/`LT_MOD_MOTION` from the SGR button-code modifier bits (4/8/16/32); `LT_MOD_MOTION` (drag) is producible only via mouse, hence newly `[x]` on POSIX. The other three remain `[ ]` above pending full keyboard-modifier parity validation.
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
@@ -160,7 +162,7 @@ Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
-Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. Consumed: `lt_init` defaults to `LT_INPUT_ESC`; the POSIX input path branches on `LT_INPUT_ESC` vs `LT_INPUT_ALT` for Alt-combos (Windows uses explicit modifier state, always `LT_INPUT_ALT`-style). `LT_INPUT_MOUSE` is accepted but inert pending mouse support.
+Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. Consumed: `lt_init` defaults to `LT_INPUT_ESC`; the POSIX input path branches on `LT_INPUT_ESC` vs `LT_INPUT_ALT` for Alt-combos (Windows uses explicit modifier state, always `LT_INPUT_ALT`-style). `LT_INPUT_MOUSE` is consumed on POSIX: setting it emits the SGR mouse tracking-enable handshake, and the input parser turns the resulting reports into `LT_EVENT_MOUSE` events (Windows mouse pending).
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 
@@ -211,7 +213,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
 | SGR / color emission | [x] byte-tested via pty (`tests/test_posix_sgr_output.c`) | [x] shared `lt__emit_sgr` (`src/shared/sgr.c`); colors visually confirmed in Windows Terminal via the bench SGR workloads (`bench/bench_present.c`, real `WriteFile` output) + automated byte test (`tests/test_win_sgr_output.c`) |
 | Runtime color-depth detection (`lt_detect_color_depth`) | [x] `$COLORTERM`/`$TERM` → `LT_OUTPUT_*` ceiling; hermetic `setenv` test (`tests/test_detect_color_depth.c`), wired into `examples/truecolor.c` | [x] same standard-C path (test harness POSIX-only) |
-| Mouse events | [ ] | [ ] |
+| Mouse events | [~] SGR (1006) reports parsed into `LT_EVENT_MOUSE` (button/wheel/release, 0-based coords, shift/ctrl/alt/motion mods); tracking enabled via `lt_set_input_mode(LT_INPUT_MOUSE)`, disabled on shutdown. Parser unit-tested incl. malformed/overflow rejection (`tests/test_posix_input_parse.c`); live-terminal click verification still pending | [ ] pending |
 
 ---
 

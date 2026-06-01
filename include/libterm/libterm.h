@@ -85,6 +85,15 @@ extern "C" {
 #define LT_KEY_ARROW_LEFT (0xFFFF - 20)
 #define LT_KEY_ARROW_RIGHT (0xFFFF - 21)
 
+/* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE) ----
+ * Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
+#define LT_KEY_MOUSE_LEFT (0xFFFF - 23)
+#define LT_KEY_MOUSE_RIGHT (0xFFFF - 24)
+#define LT_KEY_MOUSE_MIDDLE (0xFFFF - 25)
+#define LT_KEY_MOUSE_RELEASE (0xFFFF - 26)
+#define LT_KEY_MOUSE_WHEEL_UP (0xFFFF - 27)
+#define LT_KEY_MOUSE_WHEEL_DOWN (0xFFFF - 28)
+
 #define LT_KEY_ENTER 0x0D
 #define LT_KEY_ESC 0x1B
 #define LT_KEY_SPACE 0x20

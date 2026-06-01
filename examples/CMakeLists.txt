@@ -10,6 +10,7 @@ endfunction()
 
 libterm_add_example(hello)
 libterm_add_example(keyboard)
+libterm_add_example(mouse)
 libterm_add_example(paint)
 libterm_add_example(colors)
 libterm_add_example(truecolor)
