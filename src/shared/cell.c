@@ -20,6 +20,19 @@ int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg) {
   return LT_OK;
 }
 
+int lt_get_cell(int x, int y, struct lt_cell *out) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+  if (!out)
+    return LT_ERR;
+
+  if (!lt__g.back || x < 0 || y < 0 || x >= lt__g.width || y >= lt__g.height)
+    return LT_ERR_OUT_OF_BOUNDS;
+
+  *out = lt__g.back[(size_t)(y * lt__g.width + x)];
+  return LT_OK;
+}
+
 int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
                 const char *str) {
   if (!lt__g.initialized)

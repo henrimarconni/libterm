@@ -36,7 +36,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_set_cell` | `lt_set_cell` | [x] | [x] | Bounds-checked write into back buffer |
 | `tb_set_cell_ex` | `lt_set_cell_ex` | [ ] | [ ] | Not declared (multi-codepoint EGC variant) |
 | `tb_extend_cell` | `lt_extend_cell` | [ ] | [ ] | Not declared |
-| `tb_get_cell` | `lt_get_cell` | [ ] | [ ] | Not declared |
+| `tb_get_cell` | `lt_get_cell` | [x] | [x] | Shared (`src/shared/cell.c`): copies the back-buffer cell at (x, y) into a caller `struct lt_cell` (value copy, not an internal pointer like termbox2). Bounds-checked; `LT_ERR_NOT_INIT` before init. Tested in `tests/test_get_cell.c` |
 
 ### Input
 

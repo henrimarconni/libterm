@@ -226,6 +226,10 @@ LT_API int lt_set_cursor(int x, int y);
 LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
+/* Copy the back-buffer cell at (x, y) into *out (the buffer consumers write via
+ * lt_set_cell). Returns LT_ERR_OUT_OF_BOUNDS for an off-buffer (x, y),
+ * LT_ERR_NOT_INIT before lt_init, or LT_ERR if out is NULL. */
+LT_API int lt_get_cell(int x, int y, struct lt_cell *out);
 
 /* ---- print helpers ---- */
 /* Write a UTF-8 string into the back buffer starting at (x, y), each cell in
