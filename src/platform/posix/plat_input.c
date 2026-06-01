@@ -618,3 +618,11 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
   }
   return LT_OK;
 }
+
+int lt__plat_get_fds(int *ttyfd, int *resizefd) {
+  if (ttyfd)
+    *ttyfd = lt__posix_get_tty_fd();
+  if (resizefd)
+    *resizefd = lt__posix_resize_read_fd();
+  return LT_OK;
+}

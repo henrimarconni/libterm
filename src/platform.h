@@ -46,4 +46,8 @@ void lt__plat_commit(size_t actual);
  */
 int lt__plat_read_event(struct lt_event *ev, int timeout_ms);
 
+/* Fill *ttyfd / *resizefd (either may be NULL) with the pollable input fds.
+ * Returns LT_ERR_UNSUPPORTED_TERM on platforms that have none (Windows). */
+int lt__plat_get_fds(int *ttyfd, int *resizefd);
+
 #endif /* LIBTERM_PLATFORM_H */

@@ -271,6 +271,15 @@ LT_API int lt_sendf(const char *fmt, ...);
 LT_API int lt_poll_event(struct lt_event *event);
 LT_API int lt_peek_event(struct lt_event *event, int timeout_ms);
 
+/* Expose the underlying file descriptors so a caller can wait on libterm input
+ * inside its own select/poll/epoll loop instead of blocking in lt_poll_event:
+ * *ttyfd receives the terminal fd, *resizefd the read end of the SIGWINCH
+ * self-pipe. When either becomes readable, call lt_peek_event(ev, 0) to drain
+ * the event. Either pointer may be NULL to skip it. POSIX-only: returns
+ * LT_ERR_UNSUPPORTED_TERM on platforms without pollable fds (Windows), and
+ * LT_ERR_NOT_INIT before lt_init. */
+LT_API int lt_get_fds(int *ttyfd, int *resizefd);
+
 /* ---- input mode flags ---- */
 #define LT_INPUT_CURRENT 0
 #define LT_INPUT_ESC 1

@@ -143,3 +143,11 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
   return LT_ERR_NO_EVENT;
 }
+
+int lt__plat_get_fds(int *ttyfd, int *resizefd) {
+  /* Windows reads input via ReadConsoleInputW on a console handle, not a
+   * pollable fd, so there is nothing a select/poll loop could wait on. */
+  (void)ttyfd;
+  (void)resizefd;
+  return LT_ERR_UNSUPPORTED_TERM;
+}
