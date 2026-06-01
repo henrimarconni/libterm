@@ -510,6 +510,7 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     if (rc < 0) {
       if (errno == EINTR)
         return LT_ERR_NO_EVENT;
+      lt__g.last_errno = errno;
       return LT_ERR_POLL;
     }
 
@@ -612,6 +613,7 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
       return LT_ERR_NO_EVENT;
     }
 
+    lt__g.last_errno = errno;
     return LT_ERR_READ;
   }
   return LT_OK;

@@ -1,4 +1,7 @@
+#include "internal.h"
 #include "libterm/libterm.h"
+
+int lt_last_errno(void) { return lt__g.last_errno; }
 
 const char *lt_strerror(int code) {
   switch (code) {

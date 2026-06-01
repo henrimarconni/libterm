@@ -312,6 +312,13 @@ LT_API int lt_iswprint(uint32_t ch);
 /* ---- misc ---- */
 LT_API const char *lt_strerror(int code);
 LT_API const char *lt_version(void);
+/* The errno captured at the most recent failing syscall inside libterm (e.g.
+ * the open/tcsetattr behind LT_ERR_INIT_OPEN, or the read/select behind
+ * LT_ERR_READ / LT_ERR_POLL). Lets a caller that received such a code see the
+ * underlying cause — pass it to strerror(3). 0 if nothing has failed. Only the
+ * platform syscall paths set it; purely logical errors (LT_ERR_OUT_OF_BOUNDS,
+ * LT_ERR_NOT_INIT, ...) leave it unchanged. */
+LT_API int lt_last_errno(void);
 
 #ifdef __cplusplus
 }

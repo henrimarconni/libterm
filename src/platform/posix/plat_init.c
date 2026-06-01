@@ -1,10 +1,12 @@
 #define _DEFAULT_SOURCE
 #include <termios.h>
 
+#include "internal.h"
 #include "libterm/libterm.h"
 #include "platform.h"
 #include "posix_internal.h"
 #include "posix_resize.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -34,8 +36,12 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   if (lt__posix_tty_fd >= 0)
     return LT_ERR_INIT_ALREADY;
 
-  if (ttyfd < 0 || !isatty(ttyfd))
+  if (ttyfd < 0 || !isatty(ttyfd)) {
+    /* isatty sets ENOTTY for a non-terminal fd; surface it. For ttyfd < 0
+     * there was no syscall, so report EBADF as the closest cause. */
+    lt__g.last_errno = (ttyfd < 0) ? EBADF : errno;
     return LT_ERR_INIT_OPEN;
+  }
 
   lt__posix_tty_fd = ttyfd;
   lt__posix_tty_fd_owned = owned;
@@ -43,8 +49,10 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   int rc = LT_ERR_INIT_OPEN;
 
   /* orig_tios not captured yet -> nothing to restore (goto fail, not fail_restore) */
-  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0)
+  if (tcgetattr(lt__posix_tty_fd, &lt__posix_orig_tios) != 0) {
+    lt__g.last_errno = errno;
     goto fail;
+  }
 
   lt__posix_has_orig_tios = 1;
 
@@ -53,8 +61,10 @@ int lt__plat_init_fd(int ttyfd, int owned) {
   raw.c_cc[VMIN] = 1;
   raw.c_cc[VTIME] = 0;
   /* raw mode failed to apply -> terminal still in orig mode, do not restore */
-  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0)
+  if (tcsetattr(lt__posix_tty_fd, TCSAFLUSH, &raw) != 0) {
+    lt__g.last_errno = errno;
     goto fail;
+  }
 
   rc = lt__posix_resize_init();
   if (rc != LT_OK)
@@ -92,8 +102,10 @@ int lt__plat_init(void) {
     return LT_ERR_INIT_ALREADY;
 
   int fd = open("/dev/tty", O_RDWR);
-  if (fd < 0)
+  if (fd < 0) {
+    lt__g.last_errno = errno;
     return LT_ERR_INIT_OPEN;
+  }
 
   return lt__plat_init_fd(fd, 1);
 }

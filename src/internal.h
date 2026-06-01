@@ -38,6 +38,7 @@ struct lt__state {
   bool initialized;
   bool *dirty_rows;
   bool force_repaint; /* lt_invalidate: next present repaints every cell */
+  int last_errno;     /* errno captured at the last failing syscall (lt_last_errno) */
   int width;
   int height;
   int input_mode;
