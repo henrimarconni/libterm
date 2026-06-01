@@ -279,6 +279,16 @@ LT_API int lt_utf8_char_length(char c);
 LT_API int lt_utf8_char_to_unicode(uint32_t *out, const char *c);
 LT_API int lt_utf8_unicode_to_char(char *out, uint32_t c);
 
+/* ---- character width ---- */
+/* Number of terminal columns a codepoint occupies: 0 for combining marks and
+ * other zero-width characters, 2 for wide East-Asian / emoji characters, 1 for
+ * the rest. Returns -1 for control characters and other non-printable
+ * codepoints (mirrors POSIX wcwidth). Follows Markus Kuhn's reference ranges;
+ * not locale-dependent. */
+LT_API int lt_wcwidth(uint32_t ch);
+/* Non-zero if the codepoint is printable (i.e. lt_wcwidth(ch) >= 0). */
+LT_API int lt_iswprint(uint32_t ch);
+
 /* ---- misc ---- */
 LT_API const char *lt_strerror(int code);
 LT_API const char *lt_version(void);

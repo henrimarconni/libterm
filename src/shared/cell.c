@@ -69,11 +69,27 @@ int lt_print_ex(int x, int y, lt_attr fg, lt_attr bg, size_t *out_w,
       continue;
     }
 
+    int w = lt__wcwidth(cp);
+    if (w < 0) {
+      /* Non-printable (control char etc.): show a replacement glyph, width 1. */
+      cp = 0xFFFD;
+      w = 1;
+    }
+
+    if (w == 0) {
+      /* Zero-width (combining mark): no cell of its own, no column advance. A
+       * full grapheme renderer would merge it into the previous cell; libterm
+       * has no extend-cell yet, so it is simply not placed. */
+      continue;
+    }
+
     /* Clip off-buffer cells but keep advancing, so a later '\n' still resets to
-     * start_x and trailing lines render. */
+     * start_x and trailing lines render. A 2-column character occupies the
+     * starting cell; the second column is left for the renderer (no cell of its
+     * own, matching how termbox2 advances without writing a spacer). */
     (void)lt_set_cell(x, y, cp, fg, bg);
-    x += 1;
-    line_w += 1;
+    x += w;
+    line_w += (size_t)w;
   }
 
   if (line_w > max_w)

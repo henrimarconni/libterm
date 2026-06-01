@@ -68,6 +68,11 @@ int lt__utf8_char_length(char c);
 int lt__utf8_decode(const char *s, size_t len, lt_uchar *out);
 int lt__utf8_encode(lt_uchar ch, char out[4]);
 
+/* ---- character width (shared/wcwidth.c) ----
+ * Columns a codepoint occupies: 0 (combining/zero-width), 2 (wide CJK/emoji),
+ * 1 (normal), or -1 (non-printable). Markus Kuhn reference ranges. */
+int lt__wcwidth(lt_uchar ch);
+
 /* ---- SGR / run emission (shared/sgr.c) ----
  * Platform-independent VT byte construction; calls lt__plat_reserve/commit
  * (platform.h) to reach the per-platform output buffer. */

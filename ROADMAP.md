@@ -57,7 +57,7 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_print` | `lt_print` | [x] | [x] | Shared (`src/shared/cell.c`): UTF-8 string into the back buffer, one codepoint per cell, `\n` wraps to the start column of the next row, malformed UTF-8 → `U+FFFD`, off-buffer cells clipped. No wcwidth yet, so wide/combining chars occupy one cell |
+| `tb_print` | `lt_print` | [x] | [x] | Shared (`src/shared/cell.c`): UTF-8 string into the back buffer, advancing by `lt_wcwidth` per codepoint — wide CJK/emoji take two columns, combining marks take zero (not placed; no extend-cell yet), non-printables render as `U+FFFD`. `\n` wraps to the start column of the next row, malformed UTF-8 → `U+FFFD`, off-buffer cells clipped |
 | `tb_print_ex` | `lt_print_ex` | [x] | [x] | As `lt_print`, with `out_w` = widest line's column count. Tested in `tests/test_print.c` |
 | `tb_printf` | `lt_printf` | [x] | [x] | `vsnprintf` into a 1 KiB buffer (truncates if longer) then `lt_print` |
 | `tb_printf_ex` | `lt_printf_ex` | [ ] | [ ] | Not declared (the `out_w` + printf variant); `lt_print_ex` + `lt_printf` cover the common cases |
@@ -84,8 +84,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_has_egc` | `lt_has_egc` | [ ] | [ ] | |
 | `tb_attr_width` | `lt_attr_width` | [ ] | [ ] | |
 | `tb_version` | `lt_version` | [x] | [x] | Returns `"0.1.0"` |
-| `tb_iswprint` | `lt_iswprint` | [ ] | [ ] | |
-| `tb_wcwidth` | `lt_wcwidth` | [ ] | [ ] | |
+| `tb_iswprint` | `lt_iswprint` | [x] | [x] | Shared; non-zero when `lt_wcwidth(ch) >= 0`. Tested in `tests/test_wcwidth.c` |
+| `tb_wcwidth` | `lt_wcwidth` | [x] | [x] | Shared (`src/shared/wcwidth.c`): 0 for combining/zero-width, 2 for wide CJK/emoji, 1 otherwise, -1 for control/non-printable. Markus Kuhn reference ranges (bisected combining table + wide-range tests); not locale-dependent. Consumed by `lt_print` for correct column advance |
 
 ---
 
