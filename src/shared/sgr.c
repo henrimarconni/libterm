@@ -235,7 +235,9 @@ static int lt__render_cluster_cell(const struct lt_cell *c) {
       p[pos++] = tmp[t];
   }
 
-  for (size_t m = 0; cl && m < ncl; m++) {
+  /* The interned cluster includes the base at index 0 (it is also in c->ch,
+   * already emitted above), so the continuation codepoints start at index 1. */
+  for (size_t m = 1; cl && m < ncl; m++) {
     ub = lt__utf8_encode(cl[m], tmp);
     if (ub <= 0)
       continue; /* skip an unencodable continuation rather than emit junk */

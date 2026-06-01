@@ -109,13 +109,17 @@ int main(void) {
     assert(c._reserved != 0);
   }
 
-  /* Render: the cluster cell emits base 'e' (0x65) then U+0301 (0xCC 0x81). */
+  /* Render: the cluster cell emits base 'e' (0x65) then U+0301 (0xCC 0x81) —
+   * and the base exactly ONCE. (A regression once emitted ch AND the cluster's
+   * index-0 base, producing "ee\xCC\x81"; assert that doesn't happen.) */
   {
     g_len = 0;
     assert(lt_present() == LT_OK);
     drain(master);
     const char want[] = {'e', (char)0xCC, (char)0x81};
     assert(contains(want, sizeof want));
+    const char doubled[] = {'e', 'e', (char)0xCC, (char)0x81};
+    assert(!contains(doubled, sizeof doubled)); /* base must not be doubled */
   }
 
   /* Error cases. */
