@@ -62,13 +62,30 @@ struct lt__state {
 extern struct lt__state lt__g;
 
 /* ---- buffer ops (shared/buffer.c) ---- */
+/* (Re)allocate the back/front buffers to w*h cells (one arena allocation holds
+ * both, reset on each call), clear them to the current clear attrs, mark every
+ * row dirty, and update lt__g.width/height. No-op returning LT_OK if the size is
+ * unchanged. Returns LT_ERR for a non-positive dimension, LT_ERR_MEM on
+ * allocation failure (or a w*h that would overflow the size computation). */
 int lt__buffer_resize(int w, int h);
+/* Release the cell buffers and their arena and zero the size; safe to call when
+ * nothing is allocated. */
 void lt__buffer_free(void);
+/* Fill `count` cells of `buf` with a blank glyph in fg/bg (dispatches to the
+ * SIMD fill backend). */
 void lt__buffer_clear(struct lt_cell *buf, int count, lt_attr fg, lt_attr bg);
 
 /* ---- utf8 (shared/utf8.c) ---- */
+/* Bytes in the UTF-8 sequence lead byte `c` begins: 1-4, or 0 for an invalid
+ * lead byte. Inspects only `c`. */
 int lt__utf8_char_length(char c);
+/* Decode up to `len` bytes of `s` into *out, rejecting overlong encodings,
+ * surrogates, and codepoints above U+10FFFF. Returns the number of bytes
+ * consumed (1-4), or 0 on a NULL argument, len 0, or a malformed/incomplete
+ * sequence. */
 int lt__utf8_decode(const char *s, size_t len, lt_uchar *out);
+/* Encode codepoint `ch` into `out` (up to 4 bytes, not NUL-terminated). Returns
+ * the byte count (1-4), or 0 for a surrogate or out-of-range codepoint. */
 int lt__utf8_encode(lt_uchar ch, char out[4]);
 
 /* ---- character width (shared/wcwidth.c) ----
@@ -94,7 +111,14 @@ void lt__egc_reset(void);
  * Platform-independent VT byte construction; calls lt__plat_reserve/commit
  * (platform.h) to reach the per-platform output buffer. */
 int lt__write_uint(char *buf, int v); /* int -> decimal ASCII; returns digits */
+/* Emit a CSI ... m sequence to move the terminal's SGR state to fg/bg/attrs,
+ * diffing against the cached cur_fg/cur_bg/cur_attrs so an unchanged style emits
+ * nothing. Negative attr deltas force a reset-then-reapply. Returns LT_OK, or
+ * LT_ERR if the output buffer can't be reserved. */
 int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs);
+/* Emit `count` consecutive cells: split into same-style spans (each prefixed by
+ * lt__emit_sgr) and write their glyph bytes, falling back to per-cell emission
+ * for spans containing a grapheme cluster. Returns LT_OK or a write error. */
 int lt__render_run(const struct lt_cell *cells, int count);
 
 #endif /* LIBTERM_INTERNAL_H */

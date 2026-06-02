@@ -61,13 +61,14 @@ static void lt__egc_sweep(void) {
   if (!live)
     return; /* can't sweep this round; correctness is unaffected, only memory */
 
-  const int n = lt__g.width * lt__g.height;
+  /* Cast before multiplying: int w * int h can overflow INT_MAX (UB). */
+  const size_t n = (size_t)lt__g.width * (size_t)lt__g.height;
   const struct lt_cell *bufs[2] = {lt__g.back, lt__g.front};
   for (int b = 0; b < 2; b++) {
     const struct lt_cell *buf = bufs[b];
     if (!buf)
       continue;
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       uint32_t id = buf[i]._reserved;
       if (id > 0 && id < lt__egc_count)
         live[id] = true;
