@@ -176,17 +176,14 @@ static enum lt__key_match lt__match_csi_param(const unsigned char *seq,
                                               size_t *consumed) {
   int params[2] = {0, 0};
   int pi = 0;
-  bool seen_digit = false;
   size_t i = 2;
   for (; i < len; i++) {
     unsigned char c = seq[i];
     if (c >= '0' && c <= '9') {
       params[pi <= 1 ? pi : 1] = lt__km_accum(params[pi <= 1 ? pi : 1], c);
-      seen_digit = true;
     } else if (c == ';') {
       if (pi < 1)
         pi++;
-      seen_digit = false;
     } else {
       break; /* final byte */
     }
