@@ -86,6 +86,26 @@ extern "C" {
 #define LT_KEY_ARROW_RIGHT (0xFFFF - 21)
 #define LT_KEY_BACK_TAB (0xFFFF - 22) /* Shift+Tab, CSI Z; mirrors termbox2 */
 
+/* ---- key action (lt_event.action) ---- */
+/* In the modern input model libterm reports the action of a key event. Legacy
+ * decoding and compat mode always report PRESS. REPEAT/RELEASE are only
+ * delivered by terminals speaking the kitty keyboard protocol. */
+#define LT_KEY_PRESS 1
+#define LT_KEY_REPEAT 2
+#define LT_KEY_RELEASE 3
+
+/* ---- bare modifier keys (modern model only) ---- */
+/* A modifier pressed on its own. Only emitted on kitty-capable terminals; never
+ * in compat mode (legacy terminals send no bytes for a bare modifier). */
+#define LT_KEY_LEFT_SHIFT (0xFFFF - 29)
+#define LT_KEY_RIGHT_SHIFT (0xFFFF - 30)
+#define LT_KEY_LEFT_CTRL (0xFFFF - 31)
+#define LT_KEY_RIGHT_CTRL (0xFFFF - 32)
+#define LT_KEY_LEFT_ALT (0xFFFF - 33)
+#define LT_KEY_RIGHT_ALT (0xFFFF - 34)
+#define LT_KEY_LEFT_SUPER (0xFFFF - 35)
+#define LT_KEY_RIGHT_SUPER (0xFFFF - 36)
+
 /* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE)
  * ---- Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
 #define LT_KEY_MOUSE_LEFT (0xFFFF - 23)
@@ -211,6 +231,8 @@ struct lt_event {
   int32_t h;
   int32_t x;
   int32_t y;
+  uint8_t action; /* LT_KEY_PRESS/REPEAT/RELEASE; PRESS unless kitty reports
+                     otherwise */
 };
 
 /* ---- lifecycle ---- */
@@ -359,6 +381,11 @@ LT_API int lt_get_fds(int *ttyfd, int *resizefd);
 #define LT_INPUT_ESC 1
 #define LT_INPUT_ALT 2
 #define LT_INPUT_MOUSE 4
+/* Opt-in legacy termbox2 semantics: standalone control bytes are reported in
+ * `key` (Ctrl+A -> key=0x01, ch=0), Shift+letter arrives as an uppercase `ch`
+ * with no modifier, and the kitty keyboard protocol is NOT negotiated. Without
+ * this flag libterm uses the modern model (see lt_set_input_mode). */
+#define LT_INPUT_COMPAT 8
 
 /* Select how input is reported, an OR of LT_INPUT_* flags. LT_INPUT_ESC (the
  * default) reports a lone ESC as its own key and an Alt-combo as ESC followed

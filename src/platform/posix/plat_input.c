@@ -98,41 +98,29 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
   return len;
 }
 
-static size_t lt__posix_read_esc_tail(unsigned char *buf, size_t cap) {
-  ssize_t n;
-  size_t len = 1;
-  int rc = 0;
-
+/* Read one more byte within the inter-byte grace period. Returns true and sets
+ * *out on success; false on timeout/EOF/error. Mirrors the timeout used by the
+ * UTF-8 and escape-tail readers. */
+static bool lt__posix_read_one_grace(unsigned char *out) {
   int ttyfd = lt__posix_get_tty_fd();
   if (ttyfd < 0)
-    return len;
-
-  while (len < cap) {
-    /* Reset every iteration: Linux's select() updates tv with the unslept
-     * remainder, so a shared tv would shrink toward zero across bytes. */
+    return false;
+  for (;;) {
     struct timeval tv = {.tv_sec = 0, .tv_usec = LT__ESC_SEQ_TIMEOUT_MS * 1000};
-
     fd_set rfds;
     FD_ZERO(&rfds);
     FD_SET(ttyfd, &rfds);
-
-    rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
+    int rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
     if (rc < 0) {
       if (errno == EINTR)
-        continue; /* interrupted before any byte was ready; wait again */
-      break;
+        continue;
+      return false;
     }
     if (rc == 0)
-      break; /* no more bytes within the grace period: sequence is complete */
-
-    n = read(ttyfd, &buf[len], 1);
-    if (n != 1)
-      break;
-
-    len++;
+      return false;
+    ssize_t k = read(ttyfd, out, 1);
+    return k == 1;
   }
-
-  return len;
 }
 
 static unsigned int lt__posix_parse_csi_mod(int mod_code) {
@@ -341,14 +329,19 @@ static bool lt__posix_pending_pop(struct lt_event *ev) {
 }
 
 /* Handle an ESC-prefixed sequence that no recognized-key branch claimed — i.e.
- * Alt+<key>, which a terminal encodes as ESC then the key byte(s). Behavior is
- * governed by lt_set_input_mode:
- *   LT_INPUT_ALT: one event, the key with LT_MOD_ALT set.
- *   LT_INPUT_ESC: emit LT_KEY_ESC now; replay the trailing byte(s) as the next
- *                 event(s) (termbox2's two-event default). */
+ * Alt+<key>, which a legacy terminal encodes as ESC then the key byte(s).
+ * (On a kitty-capable terminal Alt arrives as a CSI-u modifier and never
+ * reaches here.) Behavior:
+ *   fold  -> one event, the key with LT_MOD_ALT set. Used in the modern model
+ *            (default) and in compat mode with LT_INPUT_ALT.
+ *   split -> emit LT_KEY_ESC now; replay the trailing byte(s) as the next
+ *            event(s). termbox2's two-event default, used in compat mode
+ *            without LT_INPUT_ALT (LT_INPUT_ESC). */
 static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
                                       struct lt_event *ev) {
-  if (lt__g.input_mode == LT_INPUT_ALT) {
+  bool fold = !(lt__g.input_mode & LT_INPUT_COMPAT) ||
+              (lt__g.input_mode & LT_INPUT_ALT);
+  if (fold) {
     unsigned char b = seq[1];
     if (!lt__posix_ctrl_byte_event(b, ev))
       ev->ch = (lt_uchar)b;
@@ -356,7 +349,7 @@ static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
     return LT_OK;
   }
 
-  /* LT_INPUT_ESC (default). */
+  /* compat mode, LT_INPUT_ESC (the termbox2 two-event default). */
   ev->type = LT_EVENT_KEY;
   ev->mod = 0;
   ev->key = LT_KEY_ESC;
@@ -622,30 +615,60 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     n = read(ttyfd, &ch, 1);
 
     if (n > 0) {
-      if (ch == '\x1b') {
-        /* Large enough for an SGR mouse report (ESC[<Cb;Cx;Cy M, up to ~16 B
-         * with 3-digit coords) as well as the shorter CSI/SS3 key sequences. */
-        unsigned char seq[32] = {'\x1b'};
-        size_t seq_len = lt__posix_read_esc_tail(seq, sizeof(seq));
+      /* ESC or a standalone control byte -> the shared decoder. Printable and
+       * UTF-8 lead bytes fall through to the UTF-8 assembler below. */
+      if (ch == '\x1b' || (unsigned char)ch < 0x20 ||
+          (unsigned char)ch == 0x7F) {
+        unsigned char seq[64];
+        size_t len = 0;
+        seq[len++] = (unsigned char)ch;
 
-        ev->type = LT_EVENT_KEY;
-        ev->mod = 0;
-        ev->key = 0;
+        for (;;) {
+          struct lt_event tmp;
+          memset(&tmp, 0, sizeof(tmp));
+          size_t consumed = 0;
+          enum lt__key_match m =
+              lt__key_decode(seq, len, lt__g.input_mode, &tmp, &consumed);
 
-        lt__posix_parse_esc_seq(seq, seq_len, ev);
+          if (m == LT__KEY_MATCH) {
+            *ev = tmp;
+            /* Stash any bytes past the matched sequence for replay. */
+            if (consumed < len)
+              lt__posix_pending_push(seq + consumed, len - consumed);
+            return LT_OK;
+          }
 
-        /* Unrecognized ESC + byte that doesn't introduce a CSI/SS3 sequence is
-         * an Alt-combo; dispatch it by input mode. Recognized keys, characters,
-         * and bare ESC pass through unchanged. */
-        if (ev->key == 0 && ev->ch == 0 && seq_len >= 2 && seq[1] != '[' &&
-            seq[1] != 'O')
-          return lt__posix_handle_alt_combo(seq, seq_len, ev);
+          if (m == LT__KEY_PARTIAL && len < sizeof(seq)) {
+            unsigned char nb;
+            if (lt__posix_read_one_grace(&nb)) {
+              seq[len++] = nb;
+              continue;
+            }
+            /* Grace expired: finalize what we have. */
+          }
 
-        return LT_OK;
+          /* NOMATCH, buffer full, or partial that never completed: fall back to
+           * the legacy ESC/Alt-combo handling for ESC-prefixed input. */
+          if (seq[0] == 0x1b) {
+            ev->type = LT_EVENT_KEY;
+            ev->mod = 0;
+            ev->key = 0;
+            lt__posix_parse_esc_seq(seq, len, ev);
+            if (ev->key == 0 && ev->ch == 0 && len >= 2 && seq[1] != '[' &&
+                seq[1] != 'O')
+              return lt__posix_handle_alt_combo(seq, len, ev);
+            return LT_OK;
+          }
+
+          /* A lone control byte that didn't match (shouldn't happen): report
+           * it raw. */
+          ev->type = LT_EVENT_KEY;
+          ev->key = (uint16_t)seq[0];
+          ev->ch = 0;
+          ev->mod = 0;
+          return LT_OK;
+        }
       }
-
-      if (lt__posix_ctrl_byte_event((unsigned char)ch, ev))
-        return LT_OK;
 
       unsigned char seq8[4] = {(unsigned char)ch, 0, 0, 0};
       int need = lt__utf8_char_length((char)seq8[0]);

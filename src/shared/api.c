@@ -26,7 +26,12 @@ static int lt__finish_init(void) {
   lt__g.cur_attrs = 0xFFFFFFFF;
   /* termbox2 default: lone ESC is its own key, Alt-combos are reported as a
    * separate ESC followed by the key (see lt_set_input_mode / LT_INPUT_ALT). */
-  lt__g.input_mode = LT_INPUT_ESC;
+  lt__g.input_mode = 0; /* modern model by default (compat is opt-in) */
+  /* Modern model: negotiate the kitty keyboard protocol (best-effort). */
+  if (!(lt__g.input_mode & LT_INPUT_COMPAT)) {
+    if (lt__plat_kitty_enable() == LT_OK)
+      lt__g.kitty_active = true;
+  }
   lt__g.initialized = 1;
   return LT_OK;
 }
@@ -65,6 +70,11 @@ int lt_shutdown(void) {
     return LT_ERR_NOT_INIT;
   lt__buffer_free();
   lt__egc_reset();
+
+  if (lt__g.kitty_active) {
+    (void)lt__plat_kitty_disable();
+    lt__g.kitty_active = false;
+  }
 
   static const char sgr_reset[] = "\x1b[0m";
   (void)lt__plat_write(sgr_reset, sizeof(sgr_reset) - 1);

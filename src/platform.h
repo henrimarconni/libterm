@@ -71,6 +71,12 @@ void lt__plat_commit(size_t actual);
  */
 int lt__plat_read_event(struct lt_event *ev, int timeout_ms);
 
+/* Negotiate the kitty keyboard protocol. enable() pushes the desired flags,
+ * disable() pops. Best-effort: a terminal that doesn't support it ignores the
+ * bytes. No-op on platforms without escape-sequence negotiation (Windows). */
+int lt__plat_kitty_enable(void);
+int lt__plat_kitty_disable(void);
+
 /* Fill *ttyfd / *resizefd (either may be NULL) with the pollable input fds.
  * Returns LT_ERR_UNSUPPORTED_TERM on platforms that have none (Windows). */
 int lt__plat_get_fds(int *ttyfd, int *resizefd);
