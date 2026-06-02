@@ -114,5 +114,37 @@ int main(void) {
   assert(lt__key_decode((const unsigned char *)"\x1b[<0;1", 6, 0, &ev,
                         &consumed) == LT__KEY_PARTIAL);
 
+  /* kitty CSI-u: ESC [ <code> [; <mods>[:<event>]] u  (modern mode). */
+  {
+    struct lt_event e = decode_ok("\x1b[97u", 5, 0); /* 'a' */
+    assert(e.type == LT_EVENT_KEY && e.ch == 'a' && e.mod == 0);
+    assert(e.action == LT_KEY_PRESS);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[97;5u", 7, 0); /* ctrl+a */
+    assert(e.ch == 'a' && e.mod == LT_MOD_CTRL);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[97;2u", 7, 0); /* shift+a */
+    assert(e.ch == 'a' && e.mod == LT_MOD_SHIFT);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[97;1:3u", 9, 0); /* 'a' release */
+    assert(e.ch == 'a' && e.action == LT_KEY_RELEASE);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[97;1:2u", 9, 0); /* 'a' repeat */
+    assert(e.action == LT_KEY_REPEAT);
+  }
+  /* Bare modifier: kitty left-shift functional code 57441. */
+  {
+    struct lt_event e = decode_ok("\x1b[57441u", 8, 0);
+    assert(e.key == LT_KEY_LEFT_SHIFT && e.ch == 0);
+  }
+  /* Partial CSI-u (no final u yet). */
+  memset(&ev, 0, sizeof(ev));
+  assert(lt__key_decode((const unsigned char *)"\x1b[97;5", 6, 0, &ev,
+                        &consumed) == LT__KEY_PARTIAL);
+
   return 0;
 }

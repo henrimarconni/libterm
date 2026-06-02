@@ -279,6 +279,90 @@ static enum lt__key_match lt__match_mouse(const unsigned char *seq, size_t len,
   return LT__KEY_MATCH;
 }
 
+/* Map a kitty functional key code to an LT_KEY_*; 0 if it is a normal
+ * codepoint that should be reported via ch. Only the bare-modifier codes and a
+ * few are mapped here; functional navigation keys are reported through the
+ * legacy tables since terminals also send those forms. */
+static uint16_t lt__km_kitty_functional(int code) {
+  switch (code) {
+  case 57441:
+    return LT_KEY_LEFT_SHIFT;
+  case 57447:
+    return LT_KEY_RIGHT_SHIFT;
+  case 57442:
+    return LT_KEY_LEFT_CTRL;
+  case 57448:
+    return LT_KEY_RIGHT_CTRL;
+  case 57443:
+    return LT_KEY_LEFT_ALT;
+  case 57449:
+    return LT_KEY_RIGHT_ALT;
+  case 57444:
+    return LT_KEY_LEFT_SUPER;
+  case 57450:
+    return LT_KEY_RIGHT_SUPER;
+  default:
+    return 0;
+  }
+}
+
+/* kitty CSI-u: ESC [ code[:shifted:base] ; mods[:event] [; text] u.
+ * Only the primary code, the mods low bits, and the event-type sub-param are
+ * used. Returns MATCH/PARTIAL/NOMATCH. Called when seq starts ESC [ <digit>. */
+static enum lt__key_match lt__match_kitty_u(const unsigned char *seq, size_t len,
+                                            struct lt_event *out,
+                                            size_t *consumed) {
+  int code = 0, mods = 0, event = 1;
+  bool seen_code = false;
+  int field = 0;    /* 0=code, 1=mods, 2=text */
+  int subfield = 0; /* within a field, after ':' */
+  size_t i = 2;
+  for (; i < len; i++) {
+    unsigned char c = seq[i];
+    if (c >= '0' && c <= '9') {
+      if (field == 0 && subfield == 0) {
+        code = lt__km_accum(code, c);
+        seen_code = true;
+      } else if (field == 1 && subfield == 0) {
+        mods = lt__km_accum(mods, c);
+      } else if (field == 1 && subfield == 1) {
+        event = lt__km_accum(event == 1 ? 0 : event, c);
+      }
+      /* digits in other sub/fields (shifted-key, text) are ignored */
+    } else if (c == ';') {
+      field++;
+      subfield = 0;
+    } else if (c == ':') {
+      subfield++;
+    } else if (c == 'u') {
+      break;
+    } else {
+      return LT__KEY_NOMATCH;
+    }
+  }
+  if (i == len)
+    return LT__KEY_PARTIAL; /* no final u yet */
+  if (i + 1 != len || !seen_code)
+    return LT__KEY_NOMATCH;
+
+  out->type = LT_EVENT_KEY;
+  out->mod = lt__km_mods(mods);
+  out->action = (event == 2)   ? LT_KEY_REPEAT
+                : (event == 3) ? LT_KEY_RELEASE
+                               : LT_KEY_PRESS;
+
+  uint16_t fkey = lt__km_kitty_functional(code);
+  if (fkey != 0) {
+    out->key = fkey;
+    out->ch = 0;
+  } else {
+    out->key = 0;
+    out->ch = (lt_uchar)code; /* base codepoint */
+  }
+  *consumed = len;
+  return LT__KEY_MATCH;
+}
+
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
                                   int input_mode, struct lt_event *out,
                                   size_t *consumed) {
@@ -304,24 +388,34 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
       return m;
   }
 
-  /* Parametric CSI: ESC [ <digits...> <final>. */
+  /* Parametric CSI: ESC [ <digits...> <final>. A 'u' final is the kitty/CSI-u
+   * key form; ~ / letter finals are the legacy edit/cursor forms. */
   if (seq[0] == 0x1b && len >= 2 && seq[1] == '[') {
-    /* Distinguish "still a prefix" from "has a final". A bare "ESC [" or
-     * "ESC [ <digits>" with no final yet is PARTIAL. */
     bool has_digit = false;
     for (size_t i = 2; i < len; i++) {
       if (seq[i] >= '0' && seq[i] <= '9') {
         has_digit = true;
         break;
       }
-      if (seq[i] == ';')
+      if (seq[i] == ';' || seq[i] == ':')
         continue;
       break;
     }
     if (has_digit) {
-      enum lt__key_match m = lt__match_csi_param(seq, len, out, consumed);
+      /* Does the sequence end in 'u'? If a final is present and it is 'u', use
+       * the kitty parser; otherwise the legacy param parser. While no final is
+       * present yet, both report PARTIAL, so either is fine. */
+      unsigned char last = seq[len - 1];
+      enum lt__key_match m;
+      if (last == 'u')
+        m = lt__match_kitty_u(seq, len, out, consumed);
+      else
+        m = lt__match_csi_param(seq, len, out, consumed);
       if (m != LT__KEY_NOMATCH)
         return m;
+      /* If a non-final byte stream is still in flight, prefer PARTIAL. */
+      if (last != '~' && last != 'u' && !lt__km_letter_key(last))
+        return LT__KEY_PARTIAL;
     }
   }
 
