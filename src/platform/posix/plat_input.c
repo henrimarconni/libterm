@@ -135,6 +135,31 @@ static size_t lt__posix_read_esc_tail(unsigned char *buf, size_t cap) {
   return len;
 }
 
+/* Read one more byte within the inter-byte grace period. Returns true and sets
+ * *out on success; false on timeout/EOF/error. Mirrors the timeout used by the
+ * UTF-8 and escape-tail readers. */
+static bool lt__posix_read_one_grace(unsigned char *out) {
+  int ttyfd = lt__posix_get_tty_fd();
+  if (ttyfd < 0)
+    return false;
+  for (;;) {
+    struct timeval tv = {.tv_sec = 0, .tv_usec = LT__ESC_SEQ_TIMEOUT_MS * 1000};
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(ttyfd, &rfds);
+    int rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
+    if (rc < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    if (rc == 0)
+      return false;
+    ssize_t k = read(ttyfd, out, 1);
+    return k == 1;
+  }
+}
+
 static unsigned int lt__posix_parse_csi_mod(int mod_code) {
   switch (mod_code) {
   case 2:
@@ -622,30 +647,59 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     n = read(ttyfd, &ch, 1);
 
     if (n > 0) {
-      if (ch == '\x1b') {
-        /* Large enough for an SGR mouse report (ESC[<Cb;Cx;Cy M, up to ~16 B
-         * with 3-digit coords) as well as the shorter CSI/SS3 key sequences. */
-        unsigned char seq[32] = {'\x1b'};
-        size_t seq_len = lt__posix_read_esc_tail(seq, sizeof(seq));
+      /* ESC or a standalone control byte -> the shared decoder. Printable and
+       * UTF-8 lead bytes fall through to the UTF-8 assembler below. */
+      if (ch == '\x1b' || (unsigned char)ch < 0x20 || (unsigned char)ch == 0x7F) {
+        unsigned char seq[64];
+        size_t len = 0;
+        seq[len++] = (unsigned char)ch;
 
-        ev->type = LT_EVENT_KEY;
-        ev->mod = 0;
-        ev->key = 0;
+        for (;;) {
+          struct lt_event tmp;
+          memset(&tmp, 0, sizeof(tmp));
+          size_t consumed = 0;
+          enum lt__key_match m =
+              lt__key_decode(seq, len, lt__g.input_mode, &tmp, &consumed);
 
-        lt__posix_parse_esc_seq(seq, seq_len, ev);
+          if (m == LT__KEY_MATCH) {
+            *ev = tmp;
+            /* Stash any bytes past the matched sequence for replay. */
+            if (consumed < len)
+              lt__posix_pending_push(seq + consumed, len - consumed);
+            return LT_OK;
+          }
 
-        /* Unrecognized ESC + byte that doesn't introduce a CSI/SS3 sequence is
-         * an Alt-combo; dispatch it by input mode. Recognized keys, characters,
-         * and bare ESC pass through unchanged. */
-        if (ev->key == 0 && ev->ch == 0 && seq_len >= 2 && seq[1] != '[' &&
-            seq[1] != 'O')
-          return lt__posix_handle_alt_combo(seq, seq_len, ev);
+          if (m == LT__KEY_PARTIAL && len < sizeof(seq)) {
+            unsigned char nb;
+            if (lt__posix_read_one_grace(&nb)) {
+              seq[len++] = nb;
+              continue;
+            }
+            /* Grace expired: finalize what we have. */
+          }
 
-        return LT_OK;
+          /* NOMATCH, buffer full, or partial that never completed: fall back to
+           * the legacy ESC/Alt-combo handling for ESC-prefixed input. */
+          if (seq[0] == 0x1b) {
+            ev->type = LT_EVENT_KEY;
+            ev->mod = 0;
+            ev->key = 0;
+            lt__posix_parse_esc_seq(seq, len, ev);
+            if (ev->key == 0 && ev->ch == 0 && len >= 2 && seq[1] != '[' &&
+                seq[1] != 'O')
+              return lt__posix_handle_alt_combo(seq, len, ev);
+            return LT_OK;
+          }
+
+          /* A lone control byte that didn't match (shouldn't happen): report
+           * it raw. */
+          ev->type = LT_EVENT_KEY;
+          ev->key = (uint16_t)seq[0];
+          ev->ch = 0;
+          ev->mod = 0;
+          return LT_OK;
+        }
       }
-
-      if (lt__posix_ctrl_byte_event((unsigned char)ch, ev))
-        return LT_OK;
 
       unsigned char seq8[4] = {(unsigned char)ch, 0, 0, 0};
       int need = lt__utf8_char_length((char)seq8[0]);
