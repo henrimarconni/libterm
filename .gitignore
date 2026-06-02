@@ -28,5 +28,6 @@ external/
 /docs
 /.claude
 CLAUDE.md 
+AGENTS.md
 Testing/
 .no-vibe/
