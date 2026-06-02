@@ -212,6 +212,73 @@ static enum lt__key_match lt__match_csi_param(const unsigned char *seq,
   return LT__KEY_MATCH;
 }
 
+/* SGR (1006) mouse: ESC [ < Cb ; Cx ; Cy (M|m). Returns MATCH/PARTIAL/NOMATCH.
+ * Only called when seq starts with ESC [ <. */
+static enum lt__key_match lt__match_mouse(const unsigned char *seq, size_t len,
+                                          struct lt_event *out,
+                                          size_t *consumed) {
+  int num[3] = {0, 0, 0};
+  int ni = 0;
+  bool seen = false;
+  size_t i = 3;
+  for (; i < len; i++) {
+    unsigned char c = seq[i];
+    if (c >= '0' && c <= '9') {
+      num[ni] = lt__km_accum(num[ni], c);
+      seen = true;
+    } else if (c == ';') {
+      if (!seen || ni >= 2)
+        return LT__KEY_NOMATCH;
+      ni++;
+      seen = false;
+    } else if (c == 'M' || c == 'm') {
+      break;
+    } else {
+      return LT__KEY_NOMATCH;
+    }
+  }
+  if (i == len)
+    return LT__KEY_PARTIAL; /* no final M/m yet */
+  if (ni != 2 || !seen || i + 1 != len)
+    return LT__KEY_NOMATCH;
+
+  unsigned char final = seq[i];
+  int cb = num[0];
+  switch (cb & 3) {
+  case 0:
+    out->key = (cb & 64) ? LT_KEY_MOUSE_WHEEL_UP : LT_KEY_MOUSE_LEFT;
+    break;
+  case 1:
+    out->key = (cb & 64) ? LT_KEY_MOUSE_WHEEL_DOWN : LT_KEY_MOUSE_MIDDLE;
+    break;
+  case 2:
+    out->key = LT_KEY_MOUSE_RIGHT;
+    break;
+  default:
+    out->key = LT_KEY_MOUSE_RELEASE;
+    break;
+  }
+  if (final == 'm')
+    out->key = LT_KEY_MOUSE_RELEASE;
+
+  out->mod = 0;
+  if (cb & 4)
+    out->mod |= LT_MOD_SHIFT;
+  if (cb & 8)
+    out->mod |= LT_MOD_ALT;
+  if (cb & 16)
+    out->mod |= LT_MOD_CTRL;
+  if (cb & 32)
+    out->mod |= LT_MOD_MOTION;
+
+  out->x = num[1] > 0 ? num[1] - 1 : 0;
+  out->y = num[2] > 0 ? num[2] - 1 : 0;
+  out->type = LT_EVENT_MOUSE;
+  out->action = LT_KEY_PRESS;
+  *consumed = len;
+  return LT__KEY_MATCH;
+}
+
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
                                   int input_mode, struct lt_event *out,
                                   size_t *consumed) {
@@ -224,6 +291,12 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
   /* Lone ESC is a prefix of every escape sequence. */
   if (len == 1 && seq[0] == 0x1b)
     return LT__KEY_PARTIAL;
+
+  /* SGR mouse starts ESC [ < ; check before the fixed/param tables. */
+  if (seq[0] == 0x1b && len >= 3 && seq[1] == '[' && seq[2] == '<')
+    return lt__match_mouse(seq, len, out, consumed);
+  if (seq[0] == 0x1b && len == 2 && seq[1] == '[')
+    return LT__KEY_PARTIAL; /* ESC [ could still become mouse or a key */
 
   if (seq[0] == 0x1b) {
     enum lt__key_match m = lt__match_fixed(seq, len, out, consumed);

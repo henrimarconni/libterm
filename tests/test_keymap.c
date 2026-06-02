@@ -94,5 +94,25 @@ int main(void) {
   /* Overflowing numeric run must not crash; key resolves by first field. */
   assert(decode_ok("\x1b[3;9999999999~", 15, 0).key == LT_KEY_DELETE);
 
+  /* SGR mouse: ESC [ < Cb ; Cx ; Cy (M|m). */
+  {
+    struct lt_event e = decode_ok("\x1b[<0;10;5M", 10, 0);
+    assert(e.type == LT_EVENT_MOUSE);
+    assert(e.key == LT_KEY_MOUSE_LEFT);
+    assert(e.x == 9 && e.y == 4); /* 1-based -> 0-based */
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[<0;1;1m", 9, 0); /* release */
+    assert(e.type == LT_EVENT_MOUSE && e.key == LT_KEY_MOUSE_RELEASE);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[<64;3;3M", 10, 0); /* wheel up */
+    assert(e.type == LT_EVENT_MOUSE && e.key == LT_KEY_MOUSE_WHEEL_UP);
+  }
+  /* Incomplete mouse report is partial. */
+  memset(&ev, 0, sizeof(ev));
+  assert(lt__key_decode((const unsigned char *)"\x1b[<0;1", 6, 0, &ev,
+                        &consumed) == LT__KEY_PARTIAL);
+
   return 0;
 }
