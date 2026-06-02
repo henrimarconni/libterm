@@ -4,19 +4,28 @@
  * Draws a full keyboard as joined key rows: adjacent keys in a row share a
  * vertical wall (┬/┴/│ joints), and each row's outer corners are rounded.
  * Each key's interior flashes with a bright fill and fades back over ~200ms
- * when its physical key is pressed. Terminals report key *press* only (no
- * release), so the fade is driven by frame counting in the event loop.
+ * when its physical key is pressed. The fade is driven by frame counting; a
+ * key *release* (ev.action == LT_KEY_RELEASE, delivered on kitty-capable
+ * terminals) does not re-light the cap.
  *
  * It is also an HONEST probe of the libterm input API: a live event inspector
- * prints the raw lt_event fields (type/key/ch/mod, plus mouse x,y and resize
- * w,h) for whatever you press, click, scroll, or resize. Nothing is faked — a
- * cap lights only from real event fields, so e.g. Shift+letter lights just the
- * letter (the terminal/libterm reports no Shift bit for letters), which the
- * inspector makes visible rather than papering over.
+ * prints the raw lt_event fields (type/key/ch/mod/action, plus mouse x,y and
+ * resize w,h) for whatever you press, type, click, scroll, or resize. Nothing
+ * is faked — a cap lights only from real event fields.
  *
- * Showcases: the special-key set (ev.key), modifiers (ev.mod), mouse + resize
- * events, lt_detect_color_depth() color fallback, and box-drawing / arrow
- * Unicode cells decoded via the lt_utf8_* helpers.
+ * libterm's modern input model is the default: on a kitty-capable terminal
+ * (kitty, foot, ghostty, recent xterm) the keyboard protocol is negotiated, so
+ * modifiers arrive on EVERY key — Shift+letter carries LT_MOD_SHIFT, a bare
+ * modifier arrives as its own LT_KEY_LEFT_SHIFT/.../RIGHT_SUPER code, and
+ * ev.action distinguishes press/repeat/release. On a legacy terminal those
+ * bits simply aren't on the wire and degrade away; the inspector shows the raw
+ * fields either way. (Run with LT_INPUT_COMPAT for termbox2 control-byte
+ * semantics instead.)
+ *
+ * Showcases: the special-key set (ev.key), modifiers (ev.mod), key actions
+ * (ev.action), bare-modifier keys, mouse + resize events,
+ * lt_detect_color_depth() color fallback, and box-drawing / arrow Unicode
+ * cells decoded via the lt_utf8_* helpers.
  *
  * Press Ctrl+C to quit. Esc is just another key that flashes.
  */
@@ -315,6 +324,19 @@ static const char *type_name(uint8_t t) {
   }
 }
 
+static const char *action_name(uint8_t a) {
+  switch (a) {
+  case LT_KEY_PRESS:
+    return "PRESS";
+  case LT_KEY_REPEAT:
+    return "REPEAT";
+  case LT_KEY_RELEASE:
+    return "RELEASE";
+  default:
+    return "?";
+  }
+}
+
 static const char *mod_str(uint8_t mod) {
   static char buf[40];
   if (!mod)
@@ -408,6 +430,22 @@ static const char *key_name(uint16_t key) {
     return "LT_KEY_SPACE";
   case LT_KEY_BACKSPACE2:
     return "LT_KEY_BACKSPACE2/CTRL_8";
+  case LT_KEY_LEFT_SHIFT:
+    return "LT_KEY_LEFT_SHIFT";
+  case LT_KEY_RIGHT_SHIFT:
+    return "LT_KEY_RIGHT_SHIFT";
+  case LT_KEY_LEFT_CTRL:
+    return "LT_KEY_LEFT_CTRL";
+  case LT_KEY_RIGHT_CTRL:
+    return "LT_KEY_RIGHT_CTRL";
+  case LT_KEY_LEFT_ALT:
+    return "LT_KEY_LEFT_ALT";
+  case LT_KEY_RIGHT_ALT:
+    return "LT_KEY_RIGHT_ALT";
+  case LT_KEY_LEFT_SUPER:
+    return "LT_KEY_LEFT_SUPER";
+  case LT_KEY_RIGHT_SUPER:
+    return "LT_KEY_RIGHT_SUPER";
   default:
     break;
   }
@@ -452,6 +490,8 @@ static void draw_inspector(void) {
     snprintf(line2, sizeof line2, "pos  x=%d  y=%d", e->x, e->y);
   else if (e->type == LT_EVENT_RESIZE)
     snprintf(line2, sizeof line2, "size  w=%d  h=%d", e->w, e->h);
+  else if (e->type == LT_EVENT_KEY)
+    snprintf(line2, sizeof line2, "action=%s", action_name(e->action));
   if (line2[0])
     draw_text(LEFT_MARGIN + 2, y + 2, line2, LT_DEFAULT, LT_DEFAULT);
 }
@@ -537,13 +577,20 @@ static void layout(void) {
 
 static void flash_event(const struct lt_event *ev) {
   /* HONEST: caps light only from real event fields — nothing is fabricated.
-   * Terminals send no event for a bare modifier, and (currently) no Shift bit
-   * for letters, so Shift+letter lights only the letter; the inspector shows
-   * the raw mod=0, exposing that API gap rather than guessing around it.
-   *   - Alt: real LT_MOD_ALT bit (we set LT_INPUT_ALT mode).
-   *   - Ctrl+letter: decoded from the real LT_KEY_CTRL_* code (0x01..0x1A) —
-   *     these are documented key codes, not a guess. Lights Ctrl + the letter.
-   *     The three that alias Backspace/Tab/Enter stay those keys. */
+   * On a kitty-capable terminal (modern model, the default) modifiers arrive on
+   * every key, so Shift+letter carries LT_MOD_SHIFT and a bare modifier arrives
+   * as its own LT_KEY_LEFT_SHIFT/.../RIGHT_ALT key; both light the matching
+   * cap. On a legacy terminal those bits aren't on the wire and degrade away.
+   *   - Ctrl+letter, modern: ch=letter + LT_MOD_CTRL (control byte normalized),
+   *     handled by the generic ch/mod paths below.
+   *   - Ctrl+letter, compat (LT_INPUT_COMPAT): a LT_KEY_CTRL_* code instead;
+   *     normalized below so the demo lights the same caps in either mode. The
+   *     three that alias Backspace/Tab/Enter stay those keys. */
+
+  /* A key release must not re-light the cap (kitty delivers release events). */
+  if (ev->action == LT_KEY_RELEASE)
+    return;
+
   uint8_t mod = ev->mod;
   uint32_t lc = ev->ch;
   if (lc && lc < 128)
@@ -554,6 +601,25 @@ static void flash_event(const struct lt_event *ev) {
       ev->key != LT_KEY_ENTER) {
     mod |= LT_MOD_CTRL;
     lc = (uint32_t)('a' + (ev->key - 1)); /* 0x01 -> 'a' ... 0x1A -> 'z' */
+  }
+
+  /* A bare modifier press (modern model) is a dedicated key code with no ch;
+   * light the corresponding modifier cap. */
+  switch (ev->key) {
+  case LT_KEY_LEFT_SHIFT:
+  case LT_KEY_RIGHT_SHIFT:
+    mod |= LT_MOD_SHIFT;
+    break;
+  case LT_KEY_LEFT_CTRL:
+  case LT_KEY_RIGHT_CTRL:
+    mod |= LT_MOD_CTRL;
+    break;
+  case LT_KEY_LEFT_ALT:
+  case LT_KEY_RIGHT_ALT:
+    mod |= LT_MOD_ALT;
+    break;
+  default:
+    break;
   }
 
   for (int i = 0; i < NCAPS; i++) {
@@ -586,10 +652,12 @@ int main(void) {
 
   int depth = lt_detect_color_depth();
   lt_set_output_mode(depth);
-  /* ALT mode so Alt+<key> arrives as one event with LT_MOD_ALT set (instead of
-   * the default two-event Esc-prefixed encoding); MOUSE so clicks/scroll arrive
-   * as real LT_EVENT_MOUSE events for the inspector. */
-  lt_set_input_mode(LT_INPUT_ALT | LT_INPUT_MOUSE);
+  /* Modern model is the default (no LT_INPUT_COMPAT): the kitty keyboard
+   * protocol is negotiated, so modifiers arrive on every key, bare modifiers
+   * arrive as LT_KEY_* codes, and ev.action carries press/repeat/release on
+   * capable terminals (legacy terminals degrade gracefully). MOUSE adds
+   * click/scroll as LT_EVENT_MOUSE for the inspector. */
+  lt_set_input_mode(LT_INPUT_MOUSE);
   layout();
 
   int tw = lt_width(), th = lt_height();
@@ -608,7 +676,11 @@ int main(void) {
   for (;;) {
     rc = lt_peek_event(&ev, TICK_MS);
     if (rc == LT_OK) {
-      if (ev.type == LT_EVENT_KEY && ev.key == LT_KEY_CTRL_C)
+      /* Ctrl+C quits in both models: modern reports ch='c' + LT_MOD_CTRL,
+       * compat reports the LT_KEY_CTRL_C control-byte code. */
+      if (ev.type == LT_EVENT_KEY &&
+          (((ev.ch == 'c' || ev.ch == 'C') && (ev.mod & LT_MOD_CTRL)) ||
+           ev.key == LT_KEY_CTRL_C))
         break;
       g_last_ev = ev; /* record every real event for the inspector */
       g_have_ev = 1;
