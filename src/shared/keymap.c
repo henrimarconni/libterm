@@ -363,6 +363,56 @@ static enum lt__key_match lt__match_kitty_u(const unsigned char *seq, size_t len
   return LT__KEY_MATCH;
 }
 
+/* Standalone control byte (0x00-0x1F or 0x7F), not part of an escape sequence.
+ * Compat: termbox2 model (byte in key, ch=0). Modern: keep ENTER/TAB/
+ * BACKSPACE named, but normalize Ctrl+letter to a lowercase ch + LT_MOD_CTRL. */
+static void lt__decode_control_byte(unsigned char b, int input_mode,
+                                    struct lt_event *out) {
+  out->type = LT_EVENT_KEY;
+  out->action = LT_KEY_PRESS;
+
+  if (input_mode & LT_INPUT_COMPAT) {
+    out->key = (uint16_t)b;
+    out->ch = 0;
+    out->mod = 0;
+    return;
+  }
+
+  /* Modern: distinct named keys win over their Ctrl+letter alias. */
+  if (b == 0x0D) {
+    out->key = LT_KEY_ENTER;
+    return;
+  }
+  if (b == 0x09) {
+    out->key = LT_KEY_TAB;
+    return;
+  }
+  if (b == 0x08) {
+    out->key = LT_KEY_BACKSPACE;
+    return;
+  }
+  if (b == 0x7F) {
+    out->key = LT_KEY_BACKSPACE2;
+    return;
+  }
+  if (b >= 0x01 && b <= 0x1A) {
+    out->ch = (lt_uchar)('a' + (b - 1)); /* Ctrl+A..Z */
+    out->mod = LT_MOD_CTRL;
+    out->key = 0;
+    return;
+  }
+  if (b >= 0x1C && b <= 0x1F) {
+    out->ch = (lt_uchar)(b | 0x40); /* Ctrl+\ ] ^ _ */
+    out->mod = LT_MOD_CTRL;
+    out->key = 0;
+    return;
+  }
+  /* 0x00 and any leftover: report as key byte. */
+  out->key = (uint16_t)b;
+  out->ch = 0;
+  out->mod = 0;
+}
+
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
                                   int input_mode, struct lt_event *out,
                                   size_t *consumed) {
@@ -371,6 +421,14 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
     return LT__KEY_NOMATCH;
   if (len == 0)
     return LT__KEY_PARTIAL;
+
+  /* Standalone control byte (never starts an escape sequence; ESC is handled
+   * by the sequence paths below). */
+  if (len == 1 && seq[0] != 0x1b && (seq[0] < 0x20 || seq[0] == 0x7F)) {
+    lt__decode_control_byte(seq[0], input_mode, out);
+    *consumed = 1;
+    return LT__KEY_MATCH;
+  }
 
   /* Lone ESC is a prefix of every escape sequence. */
   if (len == 1 && seq[0] == 0x1b)

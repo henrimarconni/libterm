@@ -146,5 +146,29 @@ int main(void) {
   assert(lt__key_decode((const unsigned char *)"\x1b[97;5", 6, 0, &ev,
                         &consumed) == LT__KEY_PARTIAL);
 
+  /* Standalone control byte, modern model: normalize to ch + mod. */
+  {
+    struct lt_event e = decode_ok("\x01", 1, 0); /* Ctrl+A */
+    assert(e.ch == 'a' && e.mod == LT_MOD_CTRL && e.key == 0);
+  }
+  {
+    struct lt_event e = decode_ok("\x1a", 1, 0); /* Ctrl+Z */
+    assert(e.ch == 'z' && e.mod == LT_MOD_CTRL);
+  }
+  /* Named control keys stay named even in modern mode. */
+  assert(decode_ok("\r", 1, 0).key == LT_KEY_ENTER);
+  assert(decode_ok("\t", 1, 0).key == LT_KEY_TAB);
+  assert(decode_ok("\x7f", 1, 0).key == LT_KEY_BACKSPACE2);
+
+  /* Compat model: control byte reported in key, ch=0. */
+  {
+    struct lt_event e;
+    memset(&e, 0, sizeof(e));
+    size_t c = 0;
+    assert(lt__key_decode((const unsigned char *)"\x01", 1, LT_INPUT_COMPAT, &e,
+                          &c) == LT__KEY_MATCH);
+    assert(e.key == 0x01 && e.ch == 0 && e.mod == 0);
+  }
+
   return 0;
 }
