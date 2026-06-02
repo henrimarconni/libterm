@@ -231,7 +231,8 @@ struct lt_event {
   int32_t h;
   int32_t x;
   int32_t y;
-  uint8_t action; /* LT_KEY_PRESS/REPEAT/RELEASE; PRESS unless kitty reports otherwise */
+  uint8_t action; /* LT_KEY_PRESS/REPEAT/RELEASE; PRESS unless kitty reports
+                     otherwise */
 };
 
 /* ---- lifecycle ---- */

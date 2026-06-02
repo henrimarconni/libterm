@@ -612,7 +612,8 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     if (n > 0) {
       /* ESC or a standalone control byte -> the shared decoder. Printable and
        * UTF-8 lead bytes fall through to the UTF-8 assembler below. */
-      if (ch == '\x1b' || (unsigned char)ch < 0x20 || (unsigned char)ch == 0x7F) {
+      if (ch == '\x1b' || (unsigned char)ch < 0x20 ||
+          (unsigned char)ch == 0x7F) {
         unsigned char seq[64];
         size_t len = 0;
         seq[len++] = (unsigned char)ch;

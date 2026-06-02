@@ -169,8 +169,8 @@ static uint16_t lt__km_letter_key(unsigned char final) {
 }
 
 /* Parse ESC [ <p0> [; <p1>] <final> where finals are ~ or A/B/C/D/H/F and the
- * params are decimal. Returns MATCH/PARTIAL/NOMATCH. Only called for seq[1]=='['
- * with at least one digit. */
+ * params are decimal. Returns MATCH/PARTIAL/NOMATCH. Only called for
+ * seq[1]=='[' with at least one digit. */
 static enum lt__key_match lt__match_csi_param(const unsigned char *seq,
                                               size_t len, struct lt_event *out,
                                               size_t *consumed) {
@@ -309,8 +309,8 @@ static uint16_t lt__km_kitty_functional(int code) {
 /* kitty CSI-u: ESC [ code[:shifted:base] ; mods[:event] [; text] u.
  * Only the primary code, the mods low bits, and the event-type sub-param are
  * used. Returns MATCH/PARTIAL/NOMATCH. Called when seq starts ESC [ <digit>. */
-static enum lt__key_match lt__match_kitty_u(const unsigned char *seq, size_t len,
-                                            struct lt_event *out,
+static enum lt__key_match lt__match_kitty_u(const unsigned char *seq,
+                                            size_t len, struct lt_event *out,
                                             size_t *consumed) {
   int code = 0, mods = 0, event = 1;
   bool seen_code = false;
@@ -365,7 +365,8 @@ static enum lt__key_match lt__match_kitty_u(const unsigned char *seq, size_t len
 
 /* Standalone control byte (0x00-0x1F or 0x7F), not part of an escape sequence.
  * Compat: termbox2 model (byte in key, ch=0). Modern: keep ENTER/TAB/
- * BACKSPACE named, but normalize Ctrl+letter to a lowercase ch + LT_MOD_CTRL. */
+ * BACKSPACE named, but normalize Ctrl+letter to a lowercase ch + LT_MOD_CTRL.
+ */
 static void lt__decode_control_byte(unsigned char b, int input_mode,
                                     struct lt_event *out) {
   out->type = LT_EVENT_KEY;
