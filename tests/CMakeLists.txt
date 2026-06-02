@@ -103,6 +103,11 @@ if(NOT WIN32)
     target_include_directories(test_resize_event PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_resize_event COMMAND test_resize_event)
     set_tests_properties(test_resize_event PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_kitty_negotiation test_kitty_negotiation.c)
+    target_link_libraries(test_kitty_negotiation PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_kitty_negotiation PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_kitty_negotiation COMMAND test_kitty_negotiation)
+    set_tests_properties(test_kitty_negotiation PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a

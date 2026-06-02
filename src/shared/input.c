@@ -36,6 +36,15 @@ int lt_set_input_mode(int mode) {
       static const char disable[] = "\x1b[?1006l\x1b[?1000l";
       (void)lt__plat_write(disable, sizeof(disable) - 1);
     }
+
+    bool want_kitty = !(mode & LT_INPUT_COMPAT);
+    if (want_kitty && !lt__g.kitty_active) {
+      if (lt__plat_kitty_enable() == LT_OK)
+        lt__g.kitty_active = true;
+    } else if (!want_kitty && lt__g.kitty_active) {
+      (void)lt__plat_kitty_disable();
+      lt__g.kitty_active = false;
+    }
     (void)lt__plat_flush();
   }
 
