@@ -38,6 +38,7 @@ struct lt__state {
   bool initialized;
   bool *dirty_rows;
   bool force_repaint; /* lt_invalidate: next present repaints every cell */
+  bool kitty_active; /* kitty keyboard protocol was negotiated (push emitted) */
   int last_errno; /* errno captured at the last failing syscall (lt_last_errno)
                    */
   int width;
@@ -120,5 +121,19 @@ int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs);
  * lt__emit_sgr) and write their glyph bytes, falling back to per-cell emission
  * for spans containing a grapheme cluster. Returns LT_OK or a write error. */
 int lt__render_run(const struct lt_cell *cells, int count);
+
+/* ---- key sequence decoding (shared/keymap.c) ----
+ * Pure: no globals, no I/O, no syscalls. Interprets a byte sequence already
+ * read from the terminal into an lt_event. `input_mode` is the LT_INPUT_*
+ * bitmask (the COMPAT bit changes control-byte and modifier semantics). */
+enum lt__key_match {
+  LT__KEY_NOMATCH = 0, /* not a recognized sequence */
+  LT__KEY_PARTIAL = 1, /* valid prefix of a known sequence; read more */
+  LT__KEY_MATCH = 2    /* out filled; *consumed = bytes used */
+};
+
+enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
+                                  int input_mode, struct lt_event *out,
+                                  size_t *consumed);
 
 #endif /* LIBTERM_INTERNAL_H */

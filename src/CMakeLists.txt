@@ -5,6 +5,7 @@ set(LIBTERM_SHARED_SOURCES
     shared/egc.c
     shared/errors.c
     shared/input.c
+    shared/keymap.c
     shared/output.c
     shared/sgr.c
     shared/utf8.c
