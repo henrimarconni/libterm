@@ -301,6 +301,8 @@ static uint16_t lt__km_kitty_functional(int code) {
     return LT_KEY_LEFT_SUPER;
   case 57450:
     return LT_KEY_RIGHT_SUPER;
+  case 57358:
+    return LT_KEY_CAPS_LOCK;
   default:
     return 0;
   }

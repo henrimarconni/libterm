@@ -106,6 +106,10 @@ extern "C" {
 #define LT_KEY_LEFT_SUPER (0xFFFF - 35)
 #define LT_KEY_RIGHT_SUPER (0xFFFF - 36)
 
+/* Caps Lock pressed (modern model only). Reported as a key with ch == 0 on
+ * kitty-capable terminals; legacy terminals send no event for it. */
+#define LT_KEY_CAPS_LOCK (0xFFFF - 37)
+
 /* ---- mouse buttons (reported in lt_event.key when type == LT_EVENT_MOUSE)
  * ---- Values mirror termbox2 (TB_KEY_MOUSE_*) for drop-in parity. */
 #define LT_KEY_MOUSE_LEFT (0xFFFF - 23)

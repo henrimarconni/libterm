@@ -141,6 +141,11 @@ int main(void) {
     struct lt_event e = decode_ok("\x1b[57441u", 8, 0);
     assert(e.key == LT_KEY_LEFT_SHIFT && e.ch == 0);
   }
+  /* Caps Lock: kitty functional code 57358. */
+  {
+    struct lt_event e = decode_ok("\x1b[57358u", 8, 0);
+    assert(e.key == LT_KEY_CAPS_LOCK && e.ch == 0);
+  }
   /* Under report-all-keys, kitty sends Enter/Tab/Backspace/Esc as codepoints;
    * they must yield the SAME named keys as the control-byte path (consistency).
    */
