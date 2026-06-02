@@ -170,5 +170,24 @@ int main(void) {
     assert(e.key == 0x01 && e.ch == 0 && e.mod == 0);
   }
 
+  /* Compat mode reproduces termbox2 control-byte semantics across the set.
+   * Skip 0x1b (ESC): a lone ESC is a sequence prefix (LT__KEY_PARTIAL), not a
+   * standalone control-byte MATCH. */
+  for (unsigned char b = 0x01; b <= 0x1f; b++) {
+    if (b == 0x1b)
+      continue;
+    struct lt_event e;
+    memset(&e, 0, sizeof(e));
+    size_t c = 0;
+    char in = (char)b;
+    enum lt__key_match m =
+        lt__key_decode((const unsigned char *)&in, 1, LT_INPUT_COMPAT, &e, &c);
+    assert(m == LT__KEY_MATCH);
+    assert(e.key == b && e.ch == 0 && e.mod == 0);
+  }
+  /* Named-key sequences are mode-independent. */
+  assert(decode_ok("\x1b[A", 3, LT_INPUT_COMPAT).key == LT_KEY_ARROW_UP);
+  assert(decode_ok("\x1b[3~", 4, LT_INPUT_COMPAT).key == LT_KEY_DELETE);
+
   return 0;
 }
