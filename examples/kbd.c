@@ -126,7 +126,7 @@ static struct cap keeb[] = {
     {'\\', 0, 0, "\\", 5, 2, 0, 0, 0},
 
     /* row 3 — home row */
-    {0, 0, 0, "Caps", 6, 3, 0, 0, 0}, /* Caps Lock: no event, decorative */
+    {0, LT_KEY_CAPS_LOCK, 0, "Caps", 6, 3, 0, 0, 0}, /* lights on kitty terms */
     {'a', 0, 0, "A", 5, 3, 0, 0, 0},
     {'s', 0, 0, "S", 5, 3, 0, 0, 0},
     {'d', 0, 0, "D", 5, 3, 0, 0, 0},
@@ -446,6 +446,8 @@ static const char *key_name(uint16_t key) {
     return "LT_KEY_LEFT_SUPER";
   case LT_KEY_RIGHT_SUPER:
     return "LT_KEY_RIGHT_SUPER";
+  case LT_KEY_CAPS_LOCK:
+    return "LT_KEY_CAPS_LOCK";
   default:
     break;
   }
