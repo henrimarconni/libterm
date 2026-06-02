@@ -329,14 +329,19 @@ static bool lt__posix_pending_pop(struct lt_event *ev) {
 }
 
 /* Handle an ESC-prefixed sequence that no recognized-key branch claimed — i.e.
- * Alt+<key>, which a terminal encodes as ESC then the key byte(s). Behavior is
- * governed by lt_set_input_mode:
- *   LT_INPUT_ALT: one event, the key with LT_MOD_ALT set.
- *   LT_INPUT_ESC: emit LT_KEY_ESC now; replay the trailing byte(s) as the next
- *                 event(s) (termbox2's two-event default). */
+ * Alt+<key>, which a legacy terminal encodes as ESC then the key byte(s).
+ * (On a kitty-capable terminal Alt arrives as a CSI-u modifier and never
+ * reaches here.) Behavior:
+ *   fold  -> one event, the key with LT_MOD_ALT set. Used in the modern model
+ *            (default) and in compat mode with LT_INPUT_ALT.
+ *   split -> emit LT_KEY_ESC now; replay the trailing byte(s) as the next
+ *            event(s). termbox2's two-event default, used in compat mode
+ *            without LT_INPUT_ALT (LT_INPUT_ESC). */
 static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
                                       struct lt_event *ev) {
-  if (lt__g.input_mode == LT_INPUT_ALT) {
+  bool fold = !(lt__g.input_mode & LT_INPUT_COMPAT) ||
+              (lt__g.input_mode & LT_INPUT_ALT);
+  if (fold) {
     unsigned char b = seq[1];
     if (!lt__posix_ctrl_byte_event(b, ev))
       ev->ch = (lt_uchar)b;
@@ -344,7 +349,7 @@ static int lt__posix_handle_alt_combo(const unsigned char *seq, size_t seq_len,
     return LT_OK;
   }
 
-  /* LT_INPUT_ESC (default). */
+  /* compat mode, LT_INPUT_ESC (the termbox2 two-event default). */
   ev->type = LT_EVENT_KEY;
   ev->mod = 0;
   ev->key = LT_KEY_ESC;

@@ -306,6 +306,27 @@ static uint16_t lt__km_kitty_functional(int code) {
   }
 }
 
+/* Named key for a control codepoint, or 0 if none. Shared by the control-byte
+ * path and the kitty CSI-u path so the same physical key yields the same event
+ * regardless of how the terminal encoded it (raw byte vs. CSI-u under the
+ * kitty report-all-keys flag). */
+static uint16_t lt__named_control_key(uint32_t cp) {
+  switch (cp) {
+  case 0x0D:
+    return LT_KEY_ENTER;
+  case 0x09:
+    return LT_KEY_TAB;
+  case 0x08:
+    return LT_KEY_BACKSPACE;
+  case 0x7F:
+    return LT_KEY_BACKSPACE2;
+  case 0x1B:
+    return LT_KEY_ESC;
+  default:
+    return 0;
+  }
+}
+
 /* kitty CSI-u: ESC [ code[:shifted:base] ; mods[:event] [; text] u.
  * Only the primary code, the mods low bits, and the event-type sub-param are
  * used. Returns MATCH/PARTIAL/NOMATCH. Called when seq starts ESC [ <digit>. */
@@ -351,7 +372,12 @@ static enum lt__key_match lt__match_kitty_u(const unsigned char *seq,
                 : (event == 3) ? LT_KEY_RELEASE
                                : LT_KEY_PRESS;
 
+  /* A bare-modifier functional code, or a named control codepoint that kitty
+   * reports as 13/9/127/27 under report-all-keys, maps to the same LT_KEY_* the
+   * control-byte path produces — so Enter is Enter however it was encoded. */
   uint16_t fkey = lt__km_kitty_functional(code);
+  if (!fkey)
+    fkey = lt__named_control_key((uint32_t)code);
   if (fkey != 0) {
     out->key = fkey;
     out->ch = 0;
@@ -380,20 +406,9 @@ static void lt__decode_control_byte(unsigned char b, int input_mode,
   }
 
   /* Modern: distinct named keys win over their Ctrl+letter alias. */
-  if (b == 0x0D) {
-    out->key = LT_KEY_ENTER;
-    return;
-  }
-  if (b == 0x09) {
-    out->key = LT_KEY_TAB;
-    return;
-  }
-  if (b == 0x08) {
-    out->key = LT_KEY_BACKSPACE;
-    return;
-  }
-  if (b == 0x7F) {
-    out->key = LT_KEY_BACKSPACE2;
+  uint16_t named = lt__named_control_key(b);
+  if (named != 0) {
+    out->key = named;
     return;
   }
   if (b >= 0x01 && b <= 0x1A) {
@@ -417,7 +432,6 @@ static void lt__decode_control_byte(unsigned char b, int input_mode,
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
                                   int input_mode, struct lt_event *out,
                                   size_t *consumed) {
-  (void)input_mode;
   if (!seq || !out || !consumed)
     return LT__KEY_NOMATCH;
   if (len == 0)
@@ -472,8 +486,11 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
         m = lt__match_csi_param(seq, len, out, consumed);
       if (m != LT__KEY_NOMATCH)
         return m;
-      /* If a non-final byte stream is still in flight, prefer PARTIAL. */
-      if (last != '~' && last != 'u' && !lt__km_letter_key(last))
+      /* A CSI is terminated by a final byte (0x40-0x7E). If the last byte isn't
+       * a final yet (a parameter/intermediate byte, < 0x40), more is coming —
+       * wait. Otherwise it is a complete but unrecognized sequence; fall
+       * through to NOMATCH so the caller stops waiting immediately. */
+      if (last < 0x40)
         return LT__KEY_PARTIAL;
     }
   }

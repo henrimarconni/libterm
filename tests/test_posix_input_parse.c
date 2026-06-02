@@ -491,10 +491,25 @@ static void run_input_mode_alt(void) {
   }
 }
 
+static void run_input_mode_modern(void) {
+  /* Modern model (no LT_INPUT_COMPAT, the default): Alt+<key> folds into one
+   * event with LT_MOD_ALT — the ESC/ALT distinction is moot here. */
+  lt__g.input_mode = 0;
+
+  struct lt_event ev;
+  memset(&ev, 0, sizeof(ev));
+  ev.type = LT_EVENT_KEY;
+  const unsigned char s[] = {'\x1b', 'a'};
+  assert(lt__posix_handle_alt_combo(s, sizeof(s), &ev) == LT_OK);
+  assert(ev.ch == 'a');
+  assert(ev.key == 0);
+  assert(ev.mod == LT_MOD_ALT);
+}
+
 static void run_input_mode_esc(void) {
-  /* LT_INPUT_ESC: Alt+<key> -> LT_KEY_ESC now, then the byte replayed as the
-   * next event (termbox2's two-event default). */
-  lt__g.input_mode = LT_INPUT_ESC;
+  /* Compat mode defaults to the termbox2 ESC behavior: Alt+<key> -> LT_KEY_ESC
+   * now, then the byte replayed as the next event (two-event default). */
+  lt__g.input_mode = LT_INPUT_COMPAT;
   lt__posix_pending_len = 0;
   lt__posix_pending_pos = 0;
 
@@ -530,6 +545,7 @@ int main(void) {
   run_negative_cases();
   run_ctrl_byte_keys();
   run_input_mode_alt();
+  run_input_mode_modern();
   run_input_mode_esc();
   run_mouse_sgr();
   run_back_tab();

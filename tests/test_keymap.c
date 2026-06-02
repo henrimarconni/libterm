@@ -141,6 +141,22 @@ int main(void) {
     struct lt_event e = decode_ok("\x1b[57441u", 8, 0);
     assert(e.key == LT_KEY_LEFT_SHIFT && e.ch == 0);
   }
+  /* Under report-all-keys, kitty sends Enter/Tab/Backspace/Esc as codepoints;
+   * they must yield the SAME named keys as the control-byte path (consistency).
+   */
+  assert(decode_ok("\x1b[13u", 5, 0).key == LT_KEY_ENTER);
+  assert(decode_ok("\x1b[9u", 4, 0).key == LT_KEY_TAB);
+  assert(decode_ok("\x1b[127u", 6, 0).key == LT_KEY_BACKSPACE2);
+  assert(decode_ok("\x1b[27u", 5, 0).key == LT_KEY_ESC);
+  /* A complete but unrecognized CSI (final byte present) is NOMATCH, not a
+   * stall. */
+  {
+    struct lt_event e;
+    memset(&e, 0, sizeof(e));
+    size_t c = 0;
+    assert(lt__key_decode((const unsigned char *)"\x1b[1X", 4, 0, &e, &c) ==
+           LT__KEY_NOMATCH);
+  }
   /* Partial CSI-u (no final u yet). */
   memset(&ev, 0, sizeof(ev));
   assert(lt__key_decode((const unsigned char *)"\x1b[97;5", 6, 0, &ev,
