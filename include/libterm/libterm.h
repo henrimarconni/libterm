@@ -214,6 +214,12 @@ struct lt_event {
 };
 
 /* ---- lifecycle ---- */
+/* Initialize libterm against the controlling terminal (POSIX: opens "/dev/tty";
+ * Windows: the active console). Puts the terminal in raw mode, switches to the
+ * alternate screen, and allocates the cell buffers at the current size. Must be
+ * called before any drawing or input function. Returns LT_ERR_INIT_ALREADY if
+ * already initialized, or an LT_ERR_INIT_OPEN / LT_ERR_MEM on failure
+ * (lt_last_errno carries the underlying syscall cause). */
 LT_API int lt_init(void);
 /* Initialize against a caller-supplied terminal fd (POSIX). The fd must be a
  * tty (validated with isatty); it is NOT closed by lt_shutdown — the caller
@@ -225,22 +231,51 @@ LT_API int lt_init_fd(int ttyfd);
  * can't be opened or isn't a tty (lt_last_errno carries the cause). On
  * non-POSIX platforms this returns LT_ERR_INIT_OPEN. */
 LT_API int lt_init_file(const char *path);
+/* Restore the terminal to its pre-init state: leave the alternate screen,
+ * disable mouse reporting, show the cursor, restore the saved termios, and free
+ * the cell buffers and cluster table. The fd opened by lt_init / lt_init_file
+ * is closed; an fd passed to lt_init_fd is left open for the caller. Returns
+ * LT_ERR_NOT_INIT if libterm was never initialized. */
 LT_API int lt_shutdown(void);
 
 /* ---- screen ---- */
+/* Current back-buffer width / height in cells, tracking the terminal size and
+ * updated on each LT_EVENT_RESIZE. Both return 0 before lt_init. */
 LT_API int lt_width(void);
 LT_API int lt_height(void);
+/* Reset every back-buffer cell to a blank in the current clear attrs (see
+ * lt_set_clear_attrs) and mark all rows dirty, so the next lt_present paints a
+ * cleared screen. Emits nothing by itself. Returns LT_ERR_NOT_INIT before
+ * lt_init. */
 LT_API int lt_clear(void);
+/* Set the fg/bg attributes used to fill cleared cells — by lt_clear and when
+ * the buffer grows on resize. Defaults to terminal-default colors (0/0).
+ * Returns LT_ERR_NOT_INIT before lt_init. */
 LT_API int lt_set_clear_attrs(lt_attr fg, lt_attr bg);
+/* Render the back buffer to the terminal: diff it against the last presented
+ * frame and emit only the changed cells (cursor moves, SGR, glyphs) inside a
+ * synchronized-update (DEC 2026) bracket. A frame with no changes writes
+ * nothing. Call once after a batch of lt_set_cell / lt_print calls to make them
+ * visible. Returns LT_ERR_NOT_INIT before lt_init, or a write/move error code.
+ */
 LT_API int lt_present(void);
 /* Force the next lt_present to repaint every cell, bypassing the diff. Use
  * after emitting raw bytes via lt_send (or any out-of-band terminal write) that
  * desynced libterm's screen model from what is actually displayed. Returns
  * LT_ERR_NOT_INIT before lt_init. */
 LT_API int lt_invalidate(void);
+/* Move the hardware cursor to (x, y), 0-based from the top-left. Returns
+ * LT_ERR_OUT_OF_BOUNDS for a negative coordinate, LT_ERR_NOT_INIT before
+ * lt_init. */
 LT_API int lt_set_cursor(int x, int y);
+/* Hide / show the hardware cursor (DECTCEM). Each returns LT_ERR_NOT_INIT
+ * before lt_init. */
 LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);
+/* Set the back-buffer cell at (x, y) to codepoint `ch` with foreground `fg` and
+ * background `bg`, and mark its row dirty; the change appears on the next
+ * lt_present. For a multi-codepoint grapheme cluster use lt_set_cell_ex.
+ * Returns LT_ERR_OUT_OF_BOUNDS off-buffer, LT_ERR_NOT_INIT before lt_init. */
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
 /* Copy the back-buffer cell at (x, y) into *out (the buffer consumers write via
  * lt_set_cell). Returns LT_ERR_OUT_OF_BOUNDS for an off-buffer (x, y),
@@ -267,11 +302,13 @@ LT_API int lt_has_egc(void);
 
 /* ---- print helpers ---- */
 /* Write a UTF-8 string into the back buffer starting at (x, y), each cell in
- * fg/bg. Each codepoint advances one column (libterm has no wcwidth yet, so
- * wide and combining characters occupy a single cell). A '\n' moves to column
- * x of the next row. Malformed UTF-8 becomes U+FFFD. Cells outside the buffer
- * are clipped silently; only a starting (x, y) out of bounds returns
- * LT_ERR_OUT_OF_BOUNDS. Returns LT_ERR_NOT_INIT before lt_init. */
+ * fg/bg. Column advance follows lt_wcwidth: a wide East-Asian / emoji codepoint
+ * advances two columns (occupying its starting cell), a zero-width combining
+ * mark is skipped, and a non-printable codepoint shows U+FFFD and advances one.
+ * A '\n' moves to column x of the next row. Malformed UTF-8 becomes U+FFFD.
+ * Cells outside the buffer are clipped silently; only a starting (x, y) out of
+ * bounds returns LT_ERR_OUT_OF_BOUNDS. Returns LT_ERR_NOT_INIT before lt_init.
+ */
 LT_API int lt_print(int x, int y, lt_attr fg, lt_attr bg, const char *str);
 /* As lt_print, but if out_w is non-NULL it receives the number of columns
  * advanced on the widest line written. */
@@ -302,7 +339,10 @@ LT_API int lt_sendf(const char *fmt, ...);
  * available (poll timeout / interrupted). On a genuine I/O failure they return
  * the real error (LT_ERR_READ / LT_ERR_POLL) — failures are never masked as
  * "no event". Before lt_init they return LT_ERR_NOT_INIT. */
+/* Block until the next event is available (no timeout). */
 LT_API int lt_poll_event(struct lt_event *event);
+/* Wait up to timeout_ms for an event: 0 returns immediately (nonblocking),
+ * negative blocks forever (like lt_poll_event). */
 LT_API int lt_peek_event(struct lt_event *event, int timeout_ms);
 
 /* Expose the underlying file descriptors so a caller can wait on libterm input
@@ -320,6 +360,13 @@ LT_API int lt_get_fds(int *ttyfd, int *resizefd);
 #define LT_INPUT_ALT 2
 #define LT_INPUT_MOUSE 4
 
+/* Select how input is reported, an OR of LT_INPUT_* flags. LT_INPUT_ESC (the
+ * default) reports a lone ESC as its own key and an Alt-combo as ESC followed
+ * by the key; LT_INPUT_ALT folds an Alt-combo into one event with LT_MOD_ALT
+ * set. OR in LT_INPUT_MOUSE to enable SGR (1006) mouse reporting (emits the
+ * enable handshake; clearing it emits the disable). LT_INPUT_CURRENT queries
+ * without changing. Returns the resulting mode (the current mode for
+ * LT_INPUT_CURRENT). */
 LT_API int lt_set_input_mode(int mode);
 
 /* ---- output mode flags ---- */
@@ -330,6 +377,12 @@ LT_API int lt_set_input_mode(int mode);
 #define LT_OUTPUT_GRAYSCALE 4
 #define LT_OUTPUT_TRUECOLOR 5
 
+/* Select how cell colors are encoded, one of LT_OUTPUT_*: NORMAL (8 named
+ * colors), 256 / 216 / GRAYSCALE (palette indices), or TRUECOLOR (24-bit RGB).
+ * The mode reinterprets the color bits of every cell, so changing it forces the
+ * next present to re-emit colors from scratch. LT_OUTPUT_CURRENT queries
+ * without changing. Returns the resulting mode (the current mode for
+ * LT_OUTPUT_CURRENT). */
 LT_API int lt_set_output_mode(int mode);
 
 /* Inspect $COLORTERM / $TERM and return the best output mode the terminal
@@ -338,8 +391,19 @@ LT_API int lt_set_output_mode(int mode);
 LT_API int lt_detect_color_depth(void);
 
 /* ---- UTF-8 helpers ---- */
+/* Number of bytes in the UTF-8 sequence that lead byte `c` begins: 1-4, or 0 if
+ * `c` is not a valid lead byte (a continuation byte, or 0xF8-0xFF). Inspects
+ * only the one byte; does not validate the trailing bytes. */
 LT_API int lt_utf8_char_length(char c);
+/* Decode the UTF-8 sequence at `c` into *out. `c` must be NUL-terminated.
+ * Returns the number of bytes consumed (1-4) on success; 0 on a NULL/empty
+ * argument or a malformed sequence; or -i if the i-th continuation byte is NUL
+ * before the sequence completes (truncated input). */
 LT_API int lt_utf8_char_to_unicode(uint32_t *out, const char *c);
+/* Encode codepoint `c` as UTF-8 into `out` and NUL-terminate it. `out` must be
+ * at least 5 bytes: up to 4 encoded bytes plus the trailing '\0'. Returns the
+ * number of bytes written (excluding the NUL), or 0 for an unencodable
+ * codepoint (in which case out[0] is set to '\0'). */
 LT_API int lt_utf8_unicode_to_char(char *out, uint32_t c);
 
 /* ---- character width ---- */
@@ -357,7 +421,11 @@ LT_API int lt_iswprint(uint32_t ch);
 LT_API int lt_attr_width(void);
 
 /* ---- misc ---- */
+/* Static, human-readable description of an LT_* return code (e.g. "coordinates
+ * out of bounds"). Never NULL; returns "unknown error" for an unrecognized
+ * code. The returned string must not be freed or modified. */
 LT_API const char *lt_strerror(int code);
+/* Library version as a static "MAJOR.MINOR.PATCH" string (e.g. "0.1.0"). */
 LT_API const char *lt_version(void);
 /* The errno captured at the most recent failing syscall inside libterm (e.g.
  * the open/tcsetattr behind LT_ERR_INIT_OPEN, or the read/select behind

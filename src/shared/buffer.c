@@ -13,7 +13,9 @@ int lt__buffer_resize(int w, int h) {
   if (lt__g.width == w && lt__g.height == h)
     return LT_OK;
 
-  const size_t n = (size_t)(w * h);
+  /* Cast before multiplying: w/h are int (up to ~65535 from ws_col/ws_row), so
+   * w * h in int arithmetic can exceed INT_MAX — signed overflow is UB. */
+  const size_t n = (size_t)w * (size_t)h;
   if (n == 0 || n > (SIZE_MAX / (2 * sizeof(struct lt_cell))))
     return LT_ERR_MEM;
 

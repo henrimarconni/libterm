@@ -30,8 +30,8 @@ int lt_clear(void) {
   if (!lt__g.back || lt__g.width <= 0 || lt__g.height <= 0)
     return LT_ERR_NOT_INIT;
 
-  const int count = lt__g.width * lt__g.height;
-  lt__buffer_clear(lt__g.back, count, lt__g.clear_fg, lt__g.clear_bg);
+  const size_t count = (size_t)lt__g.width * (size_t)lt__g.height;
+  lt__buffer_clear(lt__g.back, (int)count, lt__g.clear_fg, lt__g.clear_bg);
 
   for (int y = 0; y < lt__g.height; y++)
     lt__g.dirty_rows[y] = true;
