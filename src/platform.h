@@ -24,9 +24,9 @@ int lt__plat_init_fd(int ttyfd, int owned);
 /* Open `path` as a tty and initialize against it; the platform owns and closes
  * the fd. Returns LT_ERR_INIT_OPEN if it can't be opened. */
 int lt__plat_init_file(const char *path);
-/* Tear down the platform layer: leave the alternate screen, restore the original
- * terminal mode, and close the fd if the platform owns it. Safe to call when not
- * initialized. */
+/* Tear down the platform layer: leave the alternate screen, restore the
+ * original terminal mode, and close the fd if the platform owns it. Safe to
+ * call when not initialized. */
 int lt__plat_shutdown(void);
 
 /* ---- terminal size ---- */
@@ -43,7 +43,8 @@ int lt__plat_write(const char *buf, size_t len);
 /* Write any buffered output to the terminal and empty the buffer. Returns LT_OK
  * (no-op on an empty buffer) or a write error. */
 int lt__plat_flush(void);
-/* Buffer a clear-screen + cursor-home sequence. Returns LT_OK or a write error. */
+/* Buffer a clear-screen + cursor-home sequence. Returns LT_OK or a write error.
+ */
 int lt__plat_clear_screen(void);
 /* Buffer a cursor-move to (x, y), 0-based. Returns LT_ERR_OUT_OF_BOUNDS for a
  * negative coordinate, otherwise LT_OK. */

@@ -233,8 +233,8 @@ LT_API int lt_init_fd(int ttyfd);
 LT_API int lt_init_file(const char *path);
 /* Restore the terminal to its pre-init state: leave the alternate screen,
  * disable mouse reporting, show the cursor, restore the saved termios, and free
- * the cell buffers and cluster table. The fd opened by lt_init / lt_init_file is
- * closed; an fd passed to lt_init_fd is left open for the caller. Returns
+ * the cell buffers and cluster table. The fd opened by lt_init / lt_init_file
+ * is closed; an fd passed to lt_init_fd is left open for the caller. Returns
  * LT_ERR_NOT_INIT if libterm was never initialized. */
 LT_API int lt_shutdown(void);
 
@@ -248,15 +248,16 @@ LT_API int lt_height(void);
  * cleared screen. Emits nothing by itself. Returns LT_ERR_NOT_INIT before
  * lt_init. */
 LT_API int lt_clear(void);
-/* Set the fg/bg attributes used to fill cleared cells — by lt_clear and when the
- * buffer grows on resize. Defaults to terminal-default colors (0/0). Returns
- * LT_ERR_NOT_INIT before lt_init. */
+/* Set the fg/bg attributes used to fill cleared cells — by lt_clear and when
+ * the buffer grows on resize. Defaults to terminal-default colors (0/0).
+ * Returns LT_ERR_NOT_INIT before lt_init. */
 LT_API int lt_set_clear_attrs(lt_attr fg, lt_attr bg);
 /* Render the back buffer to the terminal: diff it against the last presented
  * frame and emit only the changed cells (cursor moves, SGR, glyphs) inside a
  * synchronized-update (DEC 2026) bracket. A frame with no changes writes
  * nothing. Call once after a batch of lt_set_cell / lt_print calls to make them
- * visible. Returns LT_ERR_NOT_INIT before lt_init, or a write/move error code. */
+ * visible. Returns LT_ERR_NOT_INIT before lt_init, or a write/move error code.
+ */
 LT_API int lt_present(void);
 /* Force the next lt_present to repaint every cell, bypassing the diff. Use
  * after emitting raw bytes via lt_send (or any out-of-band terminal write) that
@@ -267,14 +268,14 @@ LT_API int lt_invalidate(void);
  * LT_ERR_OUT_OF_BOUNDS for a negative coordinate, LT_ERR_NOT_INIT before
  * lt_init. */
 LT_API int lt_set_cursor(int x, int y);
-/* Hide / show the hardware cursor (DECTCEM). Each returns LT_ERR_NOT_INIT before
- * lt_init. */
+/* Hide / show the hardware cursor (DECTCEM). Each returns LT_ERR_NOT_INIT
+ * before lt_init. */
 LT_API int lt_hide_cursor(void);
 LT_API int lt_show_cursor(void);
 /* Set the back-buffer cell at (x, y) to codepoint `ch` with foreground `fg` and
  * background `bg`, and mark its row dirty; the change appears on the next
- * lt_present. For a multi-codepoint grapheme cluster use lt_set_cell_ex. Returns
- * LT_ERR_OUT_OF_BOUNDS off-buffer, LT_ERR_NOT_INIT before lt_init. */
+ * lt_present. For a multi-codepoint grapheme cluster use lt_set_cell_ex.
+ * Returns LT_ERR_OUT_OF_BOUNDS off-buffer, LT_ERR_NOT_INIT before lt_init. */
 LT_API int lt_set_cell(int x, int y, lt_uchar ch, lt_attr fg, lt_attr bg);
 /* Copy the back-buffer cell at (x, y) into *out (the buffer consumers write via
  * lt_set_cell). Returns LT_ERR_OUT_OF_BOUNDS for an off-buffer (x, y),
@@ -306,7 +307,8 @@ LT_API int lt_has_egc(void);
  * mark is skipped, and a non-printable codepoint shows U+FFFD and advances one.
  * A '\n' moves to column x of the next row. Malformed UTF-8 becomes U+FFFD.
  * Cells outside the buffer are clipped silently; only a starting (x, y) out of
- * bounds returns LT_ERR_OUT_OF_BOUNDS. Returns LT_ERR_NOT_INIT before lt_init. */
+ * bounds returns LT_ERR_OUT_OF_BOUNDS. Returns LT_ERR_NOT_INIT before lt_init.
+ */
 LT_API int lt_print(int x, int y, lt_attr fg, lt_attr bg, const char *str);
 /* As lt_print, but if out_w is non-NULL it receives the number of columns
  * advanced on the widest line written. */
@@ -359,11 +361,12 @@ LT_API int lt_get_fds(int *ttyfd, int *resizefd);
 #define LT_INPUT_MOUSE 4
 
 /* Select how input is reported, an OR of LT_INPUT_* flags. LT_INPUT_ESC (the
- * default) reports a lone ESC as its own key and an Alt-combo as ESC followed by
- * the key; LT_INPUT_ALT folds an Alt-combo into one event with LT_MOD_ALT set.
- * OR in LT_INPUT_MOUSE to enable SGR (1006) mouse reporting (emits the enable
- * handshake; clearing it emits the disable). LT_INPUT_CURRENT queries without
- * changing. Returns the resulting mode (the current mode for LT_INPUT_CURRENT). */
+ * default) reports a lone ESC as its own key and an Alt-combo as ESC followed
+ * by the key; LT_INPUT_ALT folds an Alt-combo into one event with LT_MOD_ALT
+ * set. OR in LT_INPUT_MOUSE to enable SGR (1006) mouse reporting (emits the
+ * enable handshake; clearing it emits the disable). LT_INPUT_CURRENT queries
+ * without changing. Returns the resulting mode (the current mode for
+ * LT_INPUT_CURRENT). */
 LT_API int lt_set_input_mode(int mode);
 
 /* ---- output mode flags ---- */
@@ -377,8 +380,9 @@ LT_API int lt_set_input_mode(int mode);
 /* Select how cell colors are encoded, one of LT_OUTPUT_*: NORMAL (8 named
  * colors), 256 / 216 / GRAYSCALE (palette indices), or TRUECOLOR (24-bit RGB).
  * The mode reinterprets the color bits of every cell, so changing it forces the
- * next present to re-emit colors from scratch. LT_OUTPUT_CURRENT queries without
- * changing. Returns the resulting mode (the current mode for LT_OUTPUT_CURRENT). */
+ * next present to re-emit colors from scratch. LT_OUTPUT_CURRENT queries
+ * without changing. Returns the resulting mode (the current mode for
+ * LT_OUTPUT_CURRENT). */
 LT_API int lt_set_output_mode(int mode);
 
 /* Inspect $COLORTERM / $TERM and return the best output mode the terminal

@@ -64,8 +64,8 @@ extern struct lt__state lt__g;
 /* ---- buffer ops (shared/buffer.c) ---- */
 /* (Re)allocate the back/front buffers to w*h cells (one arena allocation holds
  * both, reset on each call), clear them to the current clear attrs, mark every
- * row dirty, and update lt__g.width/height. No-op returning LT_OK if the size is
- * unchanged. Returns LT_ERR for a non-positive dimension, LT_ERR_MEM on
+ * row dirty, and update lt__g.width/height. No-op returning LT_OK if the size
+ * is unchanged. Returns LT_ERR for a non-positive dimension, LT_ERR_MEM on
  * allocation failure (or a w*h that would overflow the size computation). */
 int lt__buffer_resize(int w, int h);
 /* Release the cell buffers and their arena and zero the size; safe to call when
@@ -112,9 +112,9 @@ void lt__egc_reset(void);
  * (platform.h) to reach the per-platform output buffer. */
 int lt__write_uint(char *buf, int v); /* int -> decimal ASCII; returns digits */
 /* Emit a CSI ... m sequence to move the terminal's SGR state to fg/bg/attrs,
- * diffing against the cached cur_fg/cur_bg/cur_attrs so an unchanged style emits
- * nothing. Negative attr deltas force a reset-then-reapply. Returns LT_OK, or
- * LT_ERR if the output buffer can't be reserved. */
+ * diffing against the cached cur_fg/cur_bg/cur_attrs so an unchanged style
+ * emits nothing. Negative attr deltas force a reset-then-reapply. Returns
+ * LT_OK, or LT_ERR if the output buffer can't be reserved. */
 int lt__emit_sgr(lt_attr fg, lt_attr bg, lt_attr attrs);
 /* Emit `count` consecutive cells: split into same-style spans (each prefixed by
  * lt__emit_sgr) and write their glyph bytes, falling back to per-cell emission
