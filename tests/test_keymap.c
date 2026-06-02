@@ -65,5 +65,34 @@ int main(void) {
   assert(lt__key_decode((const unsigned char *)"\x1b[", 2, 0, &ev, &consumed) ==
          LT__KEY_PARTIAL);
 
+  /* Tilde edit/function keys. */
+  assert(decode_ok("\x1b[2~", 4, 0).key == LT_KEY_INSERT);
+  assert(decode_ok("\x1b[3~", 4, 0).key == LT_KEY_DELETE);
+  assert(decode_ok("\x1b[5~", 4, 0).key == LT_KEY_PGUP);
+  assert(decode_ok("\x1b[6~", 4, 0).key == LT_KEY_PGDN);
+  assert(decode_ok("\x1b[1~", 4, 0).key == LT_KEY_HOME);
+  assert(decode_ok("\x1b[7~", 4, 0).key == LT_KEY_HOME); /* rxvt */
+  assert(decode_ok("\x1b[4~", 4, 0).key == LT_KEY_END);
+  assert(decode_ok("\x1b[8~", 4, 0).key == LT_KEY_END); /* rxvt */
+  assert(decode_ok("\x1b[15~", 5, 0).key == LT_KEY_F5);
+  assert(decode_ok("\x1b[24~", 5, 0).key == LT_KEY_F12);
+
+  /* Modified arrows: ESC [ 1 ; mods A. mods = 1 + bitmask. */
+  {
+    struct lt_event e = decode_ok("\x1b[1;2A", 6, 0); /* shift+up */
+    assert(e.key == LT_KEY_ARROW_UP && e.mod == LT_MOD_SHIFT);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[1;5C", 6, 0); /* ctrl+right */
+    assert(e.key == LT_KEY_ARROW_RIGHT && e.mod == LT_MOD_CTRL);
+  }
+  {
+    struct lt_event e = decode_ok("\x1b[3;3~", 6, 0); /* alt+delete */
+    assert(e.key == LT_KEY_DELETE && e.mod == LT_MOD_ALT);
+  }
+
+  /* Overflowing numeric run must not crash; key resolves by first field. */
+  assert(decode_ok("\x1b[3;9999999999~", 15, 0).key == LT_KEY_DELETE);
+
   return 0;
 }
