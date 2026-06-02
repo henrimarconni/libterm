@@ -169,3 +169,21 @@ int lt__plat_get_size(int *w, int *h) {
   *h = (int)ws.ws_row;
   return LT_OK;
 }
+
+/* Flags 0x1 (disambiguate) | 0x2 (event types) | 0x8 (report all keys as
+ * escape codes) = 11. Push on enable, pop on disable. */
+int lt__plat_kitty_enable(void) {
+  static const char seq[] = "\x1b[>11u";
+  int rc = lt__plat_write(seq, sizeof(seq) - 1);
+  if (rc != LT_OK)
+    return rc;
+  return lt__plat_flush();
+}
+
+int lt__plat_kitty_disable(void) {
+  static const char seq[] = "\x1b[<u";
+  int rc = lt__plat_write(seq, sizeof(seq) - 1);
+  if (rc != LT_OK)
+    return rc;
+  return lt__plat_flush();
+}

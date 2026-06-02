@@ -128,3 +128,8 @@ int lt__plat_get_size(int *w, int *h) {
   *h = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
   return LT_OK;
 }
+
+/* Windows console input is not escape-sequence-negotiated; modern key
+ * semantics on Windows are out of scope. Hooks exist so shared code links. */
+int lt__plat_kitty_enable(void) { return LT_OK; }
+int lt__plat_kitty_disable(void) { return LT_OK; }
