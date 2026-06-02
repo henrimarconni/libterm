@@ -23,8 +23,15 @@ static size_t drain(int fd, char *buf, size_t cap) {
 }
 
 int main(void) {
+  /* A non-zero winsize is required: lt_init queries the size and fails on a
+   * 0x0 pty, which would otherwise make this test self-skip. */
+  struct winsize ws;
+  memset(&ws, 0, sizeof ws);
+  ws.ws_row = 24;
+  ws.ws_col = 80;
+
   int master, slave;
-  if (openpty(&master, &slave, NULL, NULL, NULL) != 0)
+  if (openpty(&master, &slave, NULL, NULL, &ws) != 0)
     return 77; /* skip: no pty */
 
   char buf[4096];
@@ -43,7 +50,7 @@ int main(void) {
 
   /* Compat mode: no kitty push at all. */
   int master2, slave2;
-  if (openpty(&master2, &slave2, NULL, NULL, NULL) != 0)
+  if (openpty(&master2, &slave2, NULL, NULL, &ws) != 0)
     return 77;
   if (lt_init_fd(slave2) != LT_OK)
     return 77;
