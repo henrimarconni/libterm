@@ -98,43 +98,6 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
   return len;
 }
 
-static size_t lt__posix_read_esc_tail(unsigned char *buf, size_t cap) {
-  ssize_t n;
-  size_t len = 1;
-  int rc = 0;
-
-  int ttyfd = lt__posix_get_tty_fd();
-  if (ttyfd < 0)
-    return len;
-
-  while (len < cap) {
-    /* Reset every iteration: Linux's select() updates tv with the unslept
-     * remainder, so a shared tv would shrink toward zero across bytes. */
-    struct timeval tv = {.tv_sec = 0, .tv_usec = LT__ESC_SEQ_TIMEOUT_MS * 1000};
-
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(ttyfd, &rfds);
-
-    rc = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
-    if (rc < 0) {
-      if (errno == EINTR)
-        continue; /* interrupted before any byte was ready; wait again */
-      break;
-    }
-    if (rc == 0)
-      break; /* no more bytes within the grace period: sequence is complete */
-
-    n = read(ttyfd, &buf[len], 1);
-    if (n != 1)
-      break;
-
-    len++;
-  }
-
-  return len;
-}
-
 /* Read one more byte within the inter-byte grace period. Returns true and sets
  * *out on success; false on timeout/EOF/error. Mirrors the timeout used by the
  * UTF-8 and escape-tail readers. */
