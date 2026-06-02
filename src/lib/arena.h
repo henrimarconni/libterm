@@ -59,7 +59,6 @@ extern "C" {
 #else /* Linux / macOS / POSIX */
 #include <stdlib.h>
 #define MALLOC(size) malloc(size)
-#define MALLOC(size) malloc(size)
 #define CALLOC(count, size) calloc(count, size)
 #define REALLOC(ptr, size) realloc(ptr, size)
 #define FREE(ptr) free(ptr)
