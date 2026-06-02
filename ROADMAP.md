@@ -42,8 +42,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 
 | termbox2 | libterm | POSIX | Windows | Notes |
 |---|---|---|---|---|
-| `tb_poll_event` | `lt_poll_event` | [~] | [x] | POSIX now handles arrows, Home/End, Insert/Delete, PgUp/PgDn, F1–F12, CSI modifier forms, the modern CSI-u key encoding (fixterms/kitty), back-tab (`\x1b[Z`), SGR (1006) mouse reports (button/wheel/coords/modifiers → `LT_EVENT_MOUSE`), SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback; parity edge-cases across terminals still remain |
-| `tb_peek_event` | `lt_peek_event` | [~] | [x] | Same caveats as `lt_poll_event` |
+| `tb_poll_event` | `lt_poll_event` | [x] | [x] | POSIX decodes input through the shared pure decoder (`src/shared/keymap.c`, `lt__key_decode`): a fixed-sequence table (xterm normal cursor, SS3 incl. F1–F4, rxvt Shift/Ctrl arrows, Linux-console double-bracket F1–F5, back-tab) plus a parametric CSI parser (tilde edit/function keys + `ESC[1;mods` modifier suffixes), the full kitty CSI-u form (codepoint + modifiers + press/repeat/release event types + bare-modifier functional codes), SGR (1006) mouse reports (button/wheel/coords/modifiers → `LT_EVENT_MOUSE`), standalone control bytes, SIGWINCH resize events, and UTF-8 assembly with `U+FFFD` fallback. Broadened terminal coverage (xterm/SS3/rxvt/linux/tilde + modifier suffixes). Kitty progressive enhancement is negotiated by default (`lt__plat_kitty_enable`), with silent fallback to legacy parsing on non-supporting terminals; `LT_INPUT_COMPAT` opts back into termbox2 control-byte semantics |
+| `tb_peek_event` | `lt_peek_event` | [x] | [x] | Same shared-decoder path and coverage as `lt_poll_event` (non-blocking variant) |
 | `tb_get_fds` | `lt_get_fds` | [x] | [—] | Fills `*ttyfd` / `*resizefd` (either may be NULL) with the terminal fd and SIGWINCH self-pipe read end, so a consumer can wait on libterm input in its own select/poll/epoll loop and drain with `lt_peek_event(ev, 0)`. POSIX via `lt__plat_get_fds`; Windows returns `LT_ERR_UNSUPPORTED_TERM` (console handles aren't pollable fds). Tested in `tests/test_get_fds.c` (real `select()` round-trip) |
 | `tb_set_input_mode` | `lt_set_input_mode` | [x] | [x] | `lt_init` defaults to `LT_INPUT_ESC`. POSIX honors the flag for Alt-combos (`ESC <byte>`): `LT_INPUT_ALT` → one event with `LT_MOD_ALT`; `LT_INPUT_ESC` → `LT_KEY_ESC` then the byte replayed (termbox2's two-event default). Windows always reports explicit modifier state (`MOD_ALT` from `dwControlKeyState`), i.e. always `LT_INPUT_ALT`-style — the ESC-prefix distinction is a POSIX-terminal concern. `LT_INPUT_MOUSE` now emits the SGR (`?1000h`/`?1006h`) tracking-enable handshake on POSIX (disabled again on `lt_set_input_mode` clear and on `lt_shutdown`). POSIX behavior unit-tested in `tests/test_posix_input_parse.c` |
 
@@ -141,18 +141,19 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | `INSERT` / `DELETE` / `HOME` / `END` / `PGUP` / `PGDN` | [x] | [x] |
 | Ctrl+letter (`LT_KEY_CTRL_A` … termbox2 set) | [x] | [x] | A standalone control byte (`0x00-0x1F`, `0x7F`) → `ev->key` = the byte, `ch == 0`, `mod == 0`, identically on both platforms. `LT_KEY_CTRL_*` declared in `libterm.h`; POSIX byte mapping unit-tested in `tests/test_posix_input_parse.c` |
 | Back-tab (Shift+Tab, `LT_KEY_BACK_TAB`) | [x] CSI `Z` → `LT_KEY_BACK_TAB` | [ ] | POSIX parses `\x1b[Z` (per tmux + kitty); declared `libterm.h`, unit-tested. Windows pending |
-| CSI-u modern key encoding (`\x1b[cp;mods u`) | [x] codepoint → `ev->ch`, modifier bitfield → `ev->mod` | [ ] | POSIX parses the fixterms/kitty form (`external/kitty/docs/keyboard-protocol.rst`): `number` is the Unicode codepoint, `modifiers` is `1 + bitmask` (shift/alt/ctrl decoded; super/hyper/meta/locks ignored). Unit-tested in `tests/test_posix_input_parse.c`. Windows pending |
+| CSI-u modern key encoding (`\x1b[cp;mods u`) | [x] codepoint → `ev->ch`, modifier bitfield → `ev->mod`, event type → `ev->action` | [ ] | POSIX parses the full kitty/fixterms CSI-u form via the shared decoder (`src/shared/keymap.c`, `external/kitty/docs/keyboard-protocol.rst`): `number` is the Unicode codepoint, `modifiers` is `1 + bitmask` (shift/alt/ctrl decoded), and the event-type sub-parameter maps to `LT_KEY_PRESS`/`REPEAT`/`RELEASE`. Unit-tested in `tests/test_posix_input_parse.c`. Windows pending |
+| Bare-modifier keys (`LT_KEY_LEFT_SHIFT` … `LT_KEY_RIGHT_SUPER`) | [x] kitty functional codes → `ev->key` | [ ] | **Deliberate divergence from termbox2** (no equivalent there). On kitty-capable terminals a modifier pressed *alone* arrives as a functional CSI-u code and is reported as the corresponding `LT_KEY_*` constant with `ev->action`. Decoded in `src/shared/keymap.c`. Legacy terminals send zero bytes for these and cannot report them. Windows pending |
 
 ### Modifiers (`TB_MOD_*` → `LT_MOD_*`)
 
 | termbox2 | libterm | POSIX | Windows |
 |---|---|---|---|
-| `TB_MOD_ALT` | `LT_MOD_ALT` | [ ] | [x] |
-| `TB_MOD_CTRL` | `LT_MOD_CTRL` | [ ] | [x] |
-| `TB_MOD_SHIFT` | `LT_MOD_SHIFT` | [ ] | [x] |
+| `TB_MOD_ALT` | `LT_MOD_ALT` | [~] | [x] |
+| `TB_MOD_CTRL` | `LT_MOD_CTRL` | [~] | [x] |
+| `TB_MOD_SHIFT` | `LT_MOD_SHIFT` | [~] | [x] |
 | `TB_MOD_MOTION` | `LT_MOD_MOTION` | [x] | [ ] |
 
-POSIX mouse reports set `LT_MOD_SHIFT`/`LT_MOD_CTRL`/`LT_MOD_ALT`/`LT_MOD_MOTION` from the SGR button-code modifier bits (4/8/16/32); `LT_MOD_MOTION` (drag) is producible only via mouse, hence newly `[x]` on POSIX. The other three remain `[ ]` above pending full keyboard-modifier parity validation.
+On **kitty-capable terminals** (negotiated by default), POSIX now delivers `LT_MOD_ALT`/`LT_MOD_CTRL`/`LT_MOD_SHIFT` on **all keys** — including bare-modifier presses, Shift+letter, and Ctrl+letter — via the CSI-u path in the shared decoder (`src/shared/keymap.c`). On **legacy-only terminals** these are still partial (`[~]`): modifiers ride only CSI-encoded keys (arrows, F-keys, nav) since the terminal folds Shift/Ctrl+letter before libterm sees it. POSIX mouse reports also set `LT_MOD_SHIFT`/`LT_MOD_CTRL`/`LT_MOD_ALT`/`LT_MOD_MOTION` from the SGR button-code modifier bits (4/8/16/32); `LT_MOD_MOTION` (drag) is producible only via mouse, hence `[x]` on POSIX.
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
@@ -164,7 +165,7 @@ Declared: `LT_BOLD`, `LT_UNDERLINE`, `LT_REVERSE`, `LT_ITALIC`, `LT_BLINK`, `LT_
 
 ### Input modes (`TB_INPUT_*` → `LT_INPUT_*`)
 
-Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`. Consumed: `lt_init` defaults to `LT_INPUT_ESC`; the POSIX input path branches on `LT_INPUT_ESC` vs `LT_INPUT_ALT` for Alt-combos (Windows uses explicit modifier state, always `LT_INPUT_ALT`-style). `LT_INPUT_MOUSE` is consumed on POSIX: setting it emits the SGR mouse tracking-enable handshake, and the input parser turns the resulting reports into `LT_EVENT_MOUSE` events (Windows mouse pending).
+Declared: `LT_INPUT_CURRENT`, `LT_INPUT_ESC`, `LT_INPUT_ALT`, `LT_INPUT_MOUSE`, `LT_INPUT_COMPAT`. Consumed: `lt_init` defaults to `LT_INPUT_ESC`; the POSIX input path branches on `LT_INPUT_ESC` vs `LT_INPUT_ALT` for Alt-combos (Windows uses explicit modifier state, always `LT_INPUT_ALT`-style). `LT_INPUT_MOUSE` is consumed on POSIX: setting it emits the SGR mouse tracking-enable handshake, and the input parser turns the resulting reports into `LT_EVENT_MOUSE` events (Windows mouse pending). `LT_INPUT_COMPAT` is a **deliberate libterm divergence from termbox2** (no equivalent flag there): by default libterm runs the *modern* model — control bytes are normalized to `ch`+`mod` and kitty enhancement is negotiated; setting `LT_INPUT_COMPAT` restores termbox2's control-byte-in-`key` semantics and suppresses kitty negotiation (popping the enhancement on switch).
 
 ### Output modes (`TB_OUTPUT_*` → `LT_OUTPUT_*`)
 
@@ -187,7 +188,7 @@ Not declared — intentionally, alongside `lt_set_func` (deprecated upstream; se
 | `uintattr_t` | `lt_attr` (`uint32_t`) | declared and used everywhere; layout: color bits 0-23, attribute bits 24-30, `LT_HI_BLACK` bit 31 |
 | *(termbox2 uses `uint32_t` directly)* | `lt_uchar` (`uint32_t`) | libterm-internal alias for codepoints |
 | `struct tb_cell` | `struct lt_cell` (`ch`, `fg`, `bg`, `_reserved`) | Fixed 16 bytes (SIMD-aligned). EGC is handled differently from termbox2: instead of per-cell `ech`/`nech`/`cech` heap pointers, `_reserved` doubles as a grapheme-cluster id into an out-of-line content-deduped table (`src/shared/egc.c`), keeping the cell POD and the byte-equality diff intact |
-| `struct tb_event` | `struct lt_event` (`type`, `mod`, `key`, `ch`, `w`, `h`, `x`, `y`) | declared; matches termbox2 layout |
+| `struct tb_event` | `struct lt_event` (`type`, `mod`, `key`, `ch`, `w`, `h`, `x`, `y`, `action`) | declared; matches termbox2 layout plus a libterm-added `action` field. **Deliberate divergence:** `action` reports `LT_KEY_PRESS`/`LT_KEY_REPEAT`/`LT_KEY_RELEASE` (sourced from the kitty event-type sub-parameter); termbox2 has no press/repeat/release distinction. Defaults to press on legacy terminals |
 
 ---
 
@@ -236,6 +237,8 @@ These are the things that, if fixed, would move the largest number of `[~]` rows
 Features that go past the termbox2 API surface but are wanted for libterm. Not required for v1.0 (which is termbox2 parity), tracked here so the design intent isn't lost.
 
 ### Kitty keyboard protocol (progressive enhancement)
+
+> **Status: shipped.** The progressive enhancement is now implemented and negotiated by default on POSIX (`lt__plat_kitty_enable` pushes `CSI > 11 u` on init, pops `CSI < u` on shutdown; Windows is a no-op). The full kitty CSI-u form is parsed in the shared decoder (`src/shared/keymap.c`) with bare-modifier, key-release, and key-repeat support (`lt_event.action`). Opt out with `LT_INPUT_COMPAT`, which suppresses negotiation and restores termbox2 control-byte semantics. Legacy / non-supporting terminals degrade gracefully to the existing fixed-sequence + CSI parsing with no regression. (Kitty negotiation byte-sequence is verified by `tests/test_kitty_negotiation.c` via pty capture.) The original design notes below are kept for context.
 
 **Problem.** Legacy terminal input is lossy for modifiers, and it is the *terminal* encoding — not libterm — that drops the information:
 
