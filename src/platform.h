@@ -77,6 +77,12 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms);
 int lt__plat_kitty_enable(void);
 int lt__plat_kitty_disable(void);
 
+/* Enable (non-zero) or disable (zero) mouse-event reporting to match
+ * LT_INPUT_MOUSE. POSIX emits the SGR (1000/1006) tracking handshake; Windows
+ * toggles ENABLE_MOUSE_INPUT on the console input handle. Best-effort: returns
+ * LT_OK even if the underlying toggle is a no-op. */
+int lt__plat_set_mouse(int enable);
+
 /* Fill *ttyfd / *resizefd (either may be NULL) with the pollable input fds.
  * Returns LT_ERR_UNSUPPORTED_TERM on platforms that have none (Windows). */
 int lt__plat_get_fds(int *ttyfd, int *resizefd);

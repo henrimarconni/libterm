@@ -24,18 +24,11 @@ int lt_set_input_mode(int mode) {
     return lt__g.input_mode;
   lt__g.input_mode = mode;
 
-  /* Toggle SGR (1006) mouse reporting to match the requested mode. The
-   * terminal only emits mouse reports after the enable handshake, so this is
-   * the gate between "clicks do nothing" and "clicks arrive as \x1b[< ...".
-   * Guarded on init because the fd isn't open before lt_init. */
+  /* Toggle mouse reporting to match the requested mode. The platform layer owns
+   * the mechanism (POSIX: SGR 1000/1006 handshake; Windows: ENABLE_MOUSE_INPUT).
+   * Guarded on init because the terminal isn't open before lt_init. */
   if (lt__g.initialized) {
-    if (mode & LT_INPUT_MOUSE) {
-      static const char enable[] = "\x1b[?1000h\x1b[?1006h";
-      (void)lt__plat_write(enable, sizeof(enable) - 1);
-    } else {
-      static const char disable[] = "\x1b[?1006l\x1b[?1000l";
-      (void)lt__plat_write(disable, sizeof(disable) - 1);
-    }
+    (void)lt__plat_set_mouse(mode & LT_INPUT_MOUSE);
 
     bool want_kitty = !(mode & LT_INPUT_COMPAT);
     if (want_kitty && !lt__g.kitty_active) {

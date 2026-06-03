@@ -151,3 +151,21 @@ int lt__plat_get_fds(int *ttyfd, int *resizefd) {
   (void)resizefd;
   return LT_ERR_UNSUPPORTED_TERM;
 }
+
+int lt__plat_set_mouse(int enable) {
+  HANDLE in = lt__win_input_handle();
+  if (in == NULL || in == INVALID_HANDLE_VALUE)
+    return LT_OK; /* best-effort: nothing to toggle */
+
+  DWORD mode = 0;
+  if (!GetConsoleMode(in, &mode))
+    return LT_OK;
+
+  if (enable)
+    mode |= ENABLE_MOUSE_INPUT;
+  else
+    mode &= ~(DWORD)ENABLE_MOUSE_INPUT;
+
+  (void)SetConsoleMode(in, mode);
+  return LT_OK;
+}
