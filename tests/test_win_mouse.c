@@ -24,8 +24,7 @@ int main(void) {
   struct lt_event ev;
 
   /* Left-button press at (5,3), viewport origin (0,0) -> 0-based (5,3). */
-  MOUSE_EVENT_RECORD lpress =
-      mk(5, 3, FROM_LEFT_1ST_BUTTON_PRESSED, 0, 0);
+  MOUSE_EVENT_RECORD lpress = mk(5, 3, FROM_LEFT_1ST_BUTTON_PRESSED, 0, 0);
   assert(lt__win_mouse_event(&lpress, 0, 0, &ev) == 1);
   assert(ev.type == LT_EVENT_MOUSE);
   assert(ev.key == LT_KEY_MOUSE_LEFT);
@@ -52,7 +51,8 @@ int main(void) {
   assert(ev.key == LT_KEY_MOUSE_WHEEL_UP);
 
   /* Build the negative high word via unsigned widening to avoid shifting a
-   * negative signed value (UB / -Wshift-negative-value): (WORD)-120 == 0xFF88. */
+   * negative signed value (UB / -Wshift-negative-value): (WORD)-120 == 0xFF88.
+   */
   MOUSE_EVENT_RECORD wdn =
       mk(0, 0, ((DWORD)(WORD)(SHORT)-120) << 16, MOUSE_WHEELED, 0);
   assert(lt__win_mouse_event(&wdn, 0, 0, &ev) == 1);
@@ -71,8 +71,8 @@ int main(void) {
   assert(ev.x == 7 && ev.y == 8);
 
   /* Modifier bits from the control-key state. */
-  MOUSE_EVENT_RECORD modp =
-      mk(0, 0, FROM_LEFT_1ST_BUTTON_PRESSED, 0, SHIFT_PRESSED | LEFT_CTRL_PRESSED);
+  MOUSE_EVENT_RECORD modp = mk(0, 0, FROM_LEFT_1ST_BUTTON_PRESSED, 0,
+                               SHIFT_PRESSED | LEFT_CTRL_PRESSED);
   assert(lt__win_mouse_event(&modp, 0, 0, &ev) == 1);
   assert(ev.mod & LT_MOD_SHIFT);
   assert(ev.mod & LT_MOD_CTRL);

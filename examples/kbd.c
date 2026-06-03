@@ -524,11 +524,12 @@ static void observe_model(const struct lt_event *e) {
 static void draw_model_line(int y) {
   clear_line(y);
 #ifdef _WIN32
-  /* libterm's modern model reconstructs Ctrl+letter from the console virtual-key
-   * (VK_I distinct from VK_TAB) -> ch+CTRL, matching POSIX+kitty. Best-effort: it
-   * only works when the console reports the letter key. ConPTY / Windows Terminal
-   * pre-collapse Ctrl+I->Tab (VK_TAB) and Ctrl+J->Enter (VK_RETURN) before
-   * libterm, so there the letter is unrecoverable — as on POSIX legacy. */
+  /* libterm's modern model reconstructs Ctrl+letter from the console
+   * virtual-key (VK_I distinct from VK_TAB) -> ch+CTRL, matching POSIX+kitty.
+   * Best-effort: it only works when the console reports the letter key. ConPTY
+   * / Windows Terminal pre-collapse Ctrl+I->Tab (VK_TAB) and Ctrl+J->Enter
+   * (VK_RETURN) before libterm, so there the letter is unrecoverable — as on
+   * POSIX legacy. */
   draw_text(LEFT_MARGIN, y,
             "input model: Win32 console (native) - Ctrl+letter disambiguated "
             "(best-effort)",
@@ -560,7 +561,8 @@ static void draw_inspector(void) {
   clear_line(y);
   clear_line(y + 1);
   clear_line(y + 2);
-  draw_model_line(y + 3); /* persistent input-model status (kitty/legacy/Win32) */
+  draw_model_line(y +
+                  3); /* persistent input-model status (kitty/legacy/Win32) */
   draw_text(LEFT_MARGIN, y, "last libterm event (raw lt_peek_event fields):",
             LT_DEFAULT | LT_BOLD, LT_DEFAULT);
   if (!g_have_ev) {

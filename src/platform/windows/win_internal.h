@@ -12,11 +12,11 @@
  * Enter/Tab/Backspace/Esc). Returns 0 if `vk` is not a named key. */
 WORD lt__win_vk_to_lt_key(WORD vk);
 
-/* Map a bare modifier / lock key press (VK_SHIFT/CONTROL/MENU/LWIN/RWIN/CAPITAL,
- * or their explicit L/R variants) to an LT_KEY_* bare-modifier constant. Uses
- * wVirtualScanCode (0x2A left / 0x36 right shift) and the ENHANCED_KEY bit
- * (set -> right) to disambiguate generic VK_SHIFT/VK_CONTROL/VK_MENU. Returns 0
- * if `k` is not a bare modifier key. */
+/* Map a bare modifier / lock key press
+ * (VK_SHIFT/CONTROL/MENU/LWIN/RWIN/CAPITAL, or their explicit L/R variants) to
+ * an LT_KEY_* bare-modifier constant. Uses wVirtualScanCode (0x2A left / 0x36
+ * right shift) and the ENHANCED_KEY bit (set -> right) to disambiguate generic
+ * VK_SHIFT/VK_CONTROL/VK_MENU. Returns 0 if `k` is not a bare modifier key. */
 uint16_t lt__win_bare_modifier_key(const KEY_EVENT_RECORD *k);
 
 /* Map one console KEY_EVENT_RECORD to an lt_event. `cp` is the Unicode

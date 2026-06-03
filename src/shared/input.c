@@ -25,8 +25,9 @@ int lt_set_input_mode(int mode) {
   lt__g.input_mode = mode;
 
   /* Toggle mouse reporting to match the requested mode. The platform layer owns
-   * the mechanism (POSIX: SGR 1000/1006 handshake; Windows: ENABLE_MOUSE_INPUT).
-   * Guarded on init because the terminal isn't open before lt_init. */
+   * the mechanism (POSIX: SGR 1000/1006 handshake; Windows:
+   * ENABLE_MOUSE_INPUT). Guarded on init because the terminal isn't open before
+   * lt_init. */
   if (lt__g.initialized) {
     (void)lt__plat_set_mouse(mode & LT_INPUT_MOUSE);
 

@@ -58,7 +58,8 @@ uint16_t lt__win_bare_modifier_key(const KEY_EVENT_RECORD *k) {
   switch (k->wVirtualKeyCode) {
   case VK_SHIFT:
     /* scan code 0x36 is the right shift, 0x2A the left. */
-    return (k->wVirtualScanCode == 0x36) ? LT_KEY_RIGHT_SHIFT : LT_KEY_LEFT_SHIFT;
+    return (k->wVirtualScanCode == 0x36) ? LT_KEY_RIGHT_SHIFT
+                                         : LT_KEY_LEFT_SHIFT;
   case VK_CONTROL:
     return enhanced ? LT_KEY_RIGHT_CTRL : LT_KEY_LEFT_CTRL;
   case VK_MENU:
@@ -132,17 +133,19 @@ int lt__win_key_event(const KEY_EVENT_RECORD *k, lt_uchar cp, int input_mode,
   }
 
   /* Ctrl+letter, modern model: the console keeps the letter virtual-key
-   * (VK_I is distinct from VK_TAB) even though uChar collapsed to a control byte,
-   * so report it disambiguated as ch=lowercase + the held modifiers, matching
-   * POSIX+kitty - instead of the ambiguous control byte (Ctrl+I vs Tab, Ctrl+M
-   * vs Enter). Gated on cp being the Ctrl+letter control char (0x01-0x1A) AND a
-   * letter VK, which is AltGr-safe: AltGr+letter yields a printable char, not a
-   * control byte, so it never reaches here. The real Tab/Enter/Backspace keys
-   * have their own VKs and were handled by lt__win_vk_to_lt_key above. Compat
-   * mode keeps the termbox2 control-byte collapse below. */
+   * (VK_I is distinct from VK_TAB) even though uChar collapsed to a control
+   * byte, so report it disambiguated as ch=lowercase + the held modifiers,
+   * matching POSIX+kitty - instead of the ambiguous control byte (Ctrl+I vs
+   * Tab, Ctrl+M vs Enter). Gated on cp being the Ctrl+letter control char
+   * (0x01-0x1A) AND a letter VK, which is AltGr-safe: AltGr+letter yields a
+   * printable char, not a control byte, so it never reaches here. The real
+   * Tab/Enter/Backspace keys have their own VKs and were handled by
+   * lt__win_vk_to_lt_key above. Compat mode keeps the termbox2 control-byte
+   * collapse below. */
   if (!compat && cp >= 0x01 && cp <= 0x1A && k->wVirtualKeyCode >= 'A' &&
       k->wVirtualKeyCode <= 'Z') {
-    ev->ch = (lt_uchar)(k->wVirtualKeyCode + 0x20); /* VK 'A'..'Z' -> 'a'..'z' */
+    ev->ch =
+        (lt_uchar)(k->wVirtualKeyCode + 0x20); /* VK 'A'..'Z' -> 'a'..'z' */
     ev->key = 0;
     /* ev->mod already carries CTRL (+ SHIFT/ALT) from the control-key state. */
     return 1;

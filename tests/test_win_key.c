@@ -1,7 +1,8 @@
 /* White-box unit tests for the pure Windows key-event mappers
- * (lt__win_key_event / lt__win_bare_modifier_key). No console I/O: we hand-build
- * KEY_EVENT_RECORD structs and assert the resulting lt_event. Mirrors how the
- * POSIX side unit-tests the pure decoder in test_posix_input_parse.c. */
+ * (lt__win_key_event / lt__win_bare_modifier_key). No console I/O: we
+ * hand-build KEY_EVENT_RECORD structs and assert the resulting lt_event.
+ * Mirrors how the POSIX side unit-tests the pure decoder in
+ * test_posix_input_parse.c. */
 #include "libterm/libterm.h"
 #include "platform/windows/win_internal.h"
 
@@ -46,11 +47,11 @@ int main(void) {
   assert(lt__win_key_event(&f1u, 0, LT_INPUT_COMPAT, &ev) == 0);
 
   /* W2: bare modifiers, left/right disambiguation. */
-  assert(lt__win_bare_modifier_key(&(KEY_EVENT_RECORD){.wVirtualKeyCode = VK_SHIFT,
-                                                       .wVirtualScanCode = 0x2A}) ==
+  assert(lt__win_bare_modifier_key(&(KEY_EVENT_RECORD){
+             .wVirtualKeyCode = VK_SHIFT, .wVirtualScanCode = 0x2A}) ==
          LT_KEY_LEFT_SHIFT);
-  assert(lt__win_bare_modifier_key(&(KEY_EVENT_RECORD){.wVirtualKeyCode = VK_SHIFT,
-                                                       .wVirtualScanCode = 0x36}) ==
+  assert(lt__win_bare_modifier_key(&(KEY_EVENT_RECORD){
+             .wVirtualKeyCode = VK_SHIFT, .wVirtualScanCode = 0x36}) ==
          LT_KEY_RIGHT_SHIFT);
 
   KEY_EVENT_RECORD lsh = mk(VK_SHIFT, 0x2A, 0, SHIFT_PRESSED, TRUE, 1);
@@ -91,7 +92,8 @@ int main(void) {
   assert(ev.key == 0);
 
   /* Ctrl+letter, modern model: disambiguated via the virtual-key to
-   * ch=lowercase + CTRL (key=0), matching POSIX+kitty. Ctrl+C -> ch='c'+CTRL. */
+   * ch=lowercase + CTRL (key=0), matching POSIX+kitty. Ctrl+C -> ch='c'+CTRL.
+   */
   KEY_EVENT_RECORD ctrlc = mk('C', 0, 0x03, LEFT_CTRL_PRESSED, TRUE, 1);
   assert(lt__win_key_event(&ctrlc, 0x03, 0, &ev) == 1);
   assert(ev.ch == (lt_uchar)'c');
