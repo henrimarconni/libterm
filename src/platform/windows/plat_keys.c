@@ -49,27 +49,20 @@ WORD lt__win_vk_to_lt_key(WORD vk) {
 }
 
 uint16_t lt__win_bare_modifier_key(const KEY_EVENT_RECORD *k) {
+  /* ReadConsoleInputW reports the generic VK_SHIFT/VK_CONTROL/VK_MENU for
+   * modifier keys (the explicit VK_LSHIFT/VK_LCONTROL/... codes come only from
+   * GetKeyState, never from console key events). Left/right is recovered from
+   * the scan code (shift) or the ENHANCED_KEY flag (ctrl/alt). VK_LWIN/VK_RWIN
+   * and VK_CAPITAL are reported directly. */
   bool enhanced = (k->dwControlKeyState & ENHANCED_KEY) != 0;
   switch (k->wVirtualKeyCode) {
   case VK_SHIFT:
-    /* Generic shift: scan code 0x36 is the right shift, 0x2A the left. */
+    /* scan code 0x36 is the right shift, 0x2A the left. */
     return (k->wVirtualScanCode == 0x36) ? LT_KEY_RIGHT_SHIFT : LT_KEY_LEFT_SHIFT;
-  case VK_LSHIFT:
-    return LT_KEY_LEFT_SHIFT;
-  case VK_RSHIFT:
-    return LT_KEY_RIGHT_SHIFT;
   case VK_CONTROL:
     return enhanced ? LT_KEY_RIGHT_CTRL : LT_KEY_LEFT_CTRL;
-  case VK_LCONTROL:
-    return LT_KEY_LEFT_CTRL;
-  case VK_RCONTROL:
-    return LT_KEY_RIGHT_CTRL;
   case VK_MENU:
     return enhanced ? LT_KEY_RIGHT_ALT : LT_KEY_LEFT_ALT;
-  case VK_LMENU:
-    return LT_KEY_LEFT_ALT;
-  case VK_RMENU:
-    return LT_KEY_RIGHT_ALT;
   case VK_LWIN:
     return LT_KEY_LEFT_SUPER;
   case VK_RWIN:
