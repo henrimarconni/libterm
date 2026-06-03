@@ -524,13 +524,14 @@ static void observe_model(const struct lt_event *e) {
 static void draw_model_line(int y) {
   clear_line(y);
 #ifdef _WIN32
-  /* libterm's modern model on Windows reconstructs Ctrl+letter from the console
-   * virtual-key (VK_I stays distinct from VK_TAB even though uChar collapsed to
-   * 0x09), so Ctrl+I arrives as ch='i'+CTRL, not Tab — the same disambiguation
-   * kitty gives on POSIX. (LT_INPUT_COMPAT restores the control-byte collapse.) */
+  /* libterm's modern model reconstructs Ctrl+letter from the console virtual-key
+   * (VK_I distinct from VK_TAB) -> ch+CTRL, matching POSIX+kitty. Best-effort: it
+   * only works when the console reports the letter key. ConPTY / Windows Terminal
+   * pre-collapse Ctrl+I->Tab (VK_TAB) and Ctrl+J->Enter (VK_RETURN) before
+   * libterm, so there the letter is unrecoverable — as on POSIX legacy. */
   draw_text(LEFT_MARGIN, y,
-            "input model: Win32 console (native, modern) - Ctrl+letter -> "
-            "ch+CTRL",
+            "input model: Win32 console (native) - Ctrl+letter disambiguated "
+            "(best-effort)",
             LT_DEFAULT | LT_BOLD, LT_DEFAULT);
 #else
   char buf[110];
