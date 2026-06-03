@@ -51,8 +51,10 @@ int main(void) {
   assert(lt__win_mouse_event(&wup, 0, 0, &ev) == 1);
   assert(ev.key == LT_KEY_MOUSE_WHEEL_UP);
 
+  /* Build the negative high word via unsigned widening to avoid shifting a
+   * negative signed value (UB / -Wshift-negative-value): (WORD)-120 == 0xFF88. */
   MOUSE_EVENT_RECORD wdn =
-      mk(0, 0, (DWORD)(((SHORT)-120) << 16), MOUSE_WHEELED, 0);
+      mk(0, 0, ((DWORD)(WORD)(SHORT)-120) << 16, MOUSE_WHEELED, 0);
   assert(lt__win_mouse_event(&wdn, 0, 0, &ev) == 1);
   assert(ev.key == LT_KEY_MOUSE_WHEEL_DOWN);
 
