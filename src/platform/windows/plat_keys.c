@@ -4,6 +4,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include <stdbool.h>
+
 WORD lt__win_vk_to_lt_key(WORD vk) {
   // clang-format off
   switch(vk){
@@ -44,4 +46,114 @@ WORD lt__win_vk_to_lt_key(WORD vk) {
   default: return 0;
   }
   // clang-format on
+}
+
+uint16_t lt__win_bare_modifier_key(const KEY_EVENT_RECORD *k) {
+  bool enhanced = (k->dwControlKeyState & ENHANCED_KEY) != 0;
+  switch (k->wVirtualKeyCode) {
+  case VK_SHIFT:
+    /* Generic shift: scan code 0x36 is the right shift, 0x2A the left. */
+    return (k->wVirtualScanCode == 0x36) ? LT_KEY_RIGHT_SHIFT : LT_KEY_LEFT_SHIFT;
+  case VK_LSHIFT:
+    return LT_KEY_LEFT_SHIFT;
+  case VK_RSHIFT:
+    return LT_KEY_RIGHT_SHIFT;
+  case VK_CONTROL:
+    return enhanced ? LT_KEY_RIGHT_CTRL : LT_KEY_LEFT_CTRL;
+  case VK_LCONTROL:
+    return LT_KEY_LEFT_CTRL;
+  case VK_RCONTROL:
+    return LT_KEY_RIGHT_CTRL;
+  case VK_MENU:
+    return enhanced ? LT_KEY_RIGHT_ALT : LT_KEY_LEFT_ALT;
+  case VK_LMENU:
+    return LT_KEY_LEFT_ALT;
+  case VK_RMENU:
+    return LT_KEY_RIGHT_ALT;
+  case VK_LWIN:
+    return LT_KEY_LEFT_SUPER;
+  case VK_RWIN:
+    return LT_KEY_RIGHT_SUPER;
+  case VK_CAPITAL:
+    return LT_KEY_CAPS_LOCK;
+  default:
+    return 0;
+  }
+}
+
+int lt__win_key_event(const KEY_EVENT_RECORD *k, lt_uchar cp, int input_mode,
+                      struct lt_event *ev) {
+  bool compat = (input_mode & LT_INPUT_COMPAT) != 0;
+  bool down = k->bKeyDown != 0;
+
+  /* Key-up: only the modern model reports a RELEASE; compat drops it (legacy
+   * terminals cannot report releases). */
+  if (!down && compat)
+    return 0;
+
+  memset(ev, 0, sizeof(*ev));
+  ev->type = LT_EVENT_KEY;
+
+  /* action: RELEASE on key-up, REPEAT on a coalesced auto-repeat, else PRESS.
+   * Compat mode is always PRESS (matches POSIX legacy behavior). */
+  if (!down)
+    ev->action = LT_KEY_RELEASE;
+  else if (!compat && k->wRepeatCount > 1)
+    ev->action = LT_KEY_REPEAT;
+  else
+    ev->action = LT_KEY_PRESS;
+
+  /* modifiers from the console control-key state (parity with POSIX, which
+   * carries these on every key in the modern model). */
+  DWORD st = k->dwControlKeyState;
+  if (st & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
+    ev->mod |= LT_MOD_CTRL;
+  if (st & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED))
+    ev->mod |= LT_MOD_ALT;
+  if (st & SHIFT_PRESSED)
+    ev->mod |= LT_MOD_SHIFT;
+
+  /* Bare modifier / lock key (modern model only). */
+  uint16_t bare = lt__win_bare_modifier_key(k);
+  if (bare) {
+    if (compat)
+      return 0;
+    ev->key = bare;
+    ev->ch = 0;
+    return 1;
+  }
+
+  /* Back-tab: Shift+Tab (mirrors POSIX CSI Z). */
+  if (k->wVirtualKeyCode == VK_TAB && (st & SHIFT_PRESSED)) {
+    ev->key = LT_KEY_BACK_TAB;
+    ev->ch = 0;
+    return 1;
+  }
+
+  /* Named keys (arrows, F-keys, nav, Enter/Tab/Backspace/Esc). */
+  WORD mapped = lt__win_vk_to_lt_key(k->wVirtualKeyCode);
+  if (mapped) {
+    ev->key = mapped;
+    ev->ch = 0;
+    return 1;
+  }
+
+  /* Standalone control byte (Ctrl+letter etc.): termbox2 model -> key = byte,
+   * ch = 0, mod = 0, matching POSIX. */
+  if (cp != 0 && (cp < 0x20 || cp == 0x7F)) {
+    ev->mod = 0;
+    ev->key = (uint16_t)cp;
+    ev->ch = 0;
+    return 1;
+  }
+
+  /* Printable character. */
+  if (cp != 0) {
+    ev->ch = cp;
+    return 1;
+  }
+
+  /* Nothing reportable (e.g. a key-up of a key with no character in the modern
+   * model, or a dead record). */
+  return 0;
 }
