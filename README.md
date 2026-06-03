@@ -68,7 +68,7 @@ Built into `build/examples/`:
 | `print` | `lt_print` / `lt_printf`, UTF-8, wide chars, multi-line |
 | `colors` | named colors and attributes |
 | `truecolor` | 24-bit RGB, `LT_RGB`, color-depth detection |
-| `keyboard` | key and modifier reporting |
+| `keyboard` | termbox2's classic on-screen keyboard demo, ported by prefix swap (+ `LT_INPUT_COMPAT`) |
 | `mouse` | SGR mouse events |
 | `kbd` | on-screen keyboard + live event inspector (keys, modifiers, `action`, bare modifiers) with an input-model indicator (kitty / legacy / Win32) |
 
