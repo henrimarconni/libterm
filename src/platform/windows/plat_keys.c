@@ -157,3 +157,52 @@ int lt__win_key_event(const KEY_EVENT_RECORD *k, lt_uchar cp, int input_mode,
    * model, or a dead record). */
   return 0;
 }
+
+/* Pick the button key for a press/drag from the held-button bitmask, or
+ * LT_KEY_MOUSE_RELEASE if no button is down. */
+static uint16_t lt__win_mouse_button(DWORD buttons) {
+  if (buttons & FROM_LEFT_1ST_BUTTON_PRESSED)
+    return LT_KEY_MOUSE_LEFT;
+  if (buttons & RIGHTMOST_BUTTON_PRESSED)
+    return LT_KEY_MOUSE_RIGHT;
+  if (buttons & FROM_LEFT_2ND_BUTTON_PRESSED)
+    return LT_KEY_MOUSE_MIDDLE;
+  return LT_KEY_MOUSE_RELEASE;
+}
+
+int lt__win_mouse_event(const MOUSE_EVENT_RECORD *m, SHORT viewport_left,
+                        SHORT viewport_top, struct lt_event *ev) {
+  DWORD flags = m->dwEventFlags;
+
+  /* libterm has no horizontal-wheel key; drop those records. */
+  if (flags & MOUSE_HWHEELED)
+    return 0;
+
+  memset(ev, 0, sizeof(*ev));
+  ev->type = LT_EVENT_MOUSE;
+  ev->action = LT_KEY_PRESS;
+
+  if (flags & MOUSE_WHEELED) {
+    /* High word of dwButtonState is a signed wheel delta: positive is up. */
+    SHORT delta = (SHORT)HIWORD(m->dwButtonState);
+    ev->key = (delta > 0) ? LT_KEY_MOUSE_WHEEL_UP : LT_KEY_MOUSE_WHEEL_DOWN;
+  } else {
+    ev->key = lt__win_mouse_button(m->dwButtonState);
+    if (flags & MOUSE_MOVED)
+      ev->mod |= LT_MOD_MOTION; /* drag carries the held button in ev->key */
+  }
+
+  DWORD st = m->dwControlKeyState;
+  if (st & SHIFT_PRESSED)
+    ev->mod |= LT_MOD_SHIFT;
+  if (st & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED))
+    ev->mod |= LT_MOD_ALT;
+  if (st & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
+    ev->mod |= LT_MOD_CTRL;
+
+  int x = (int)m->dwMousePosition.X - (int)viewport_left;
+  int y = (int)m->dwMousePosition.Y - (int)viewport_top;
+  ev->x = x > 0 ? x : 0;
+  ev->y = y > 0 ? y : 0;
+  return 1;
+}
