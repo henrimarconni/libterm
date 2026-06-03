@@ -131,8 +131,25 @@ int lt__win_key_event(const KEY_EVENT_RECORD *k, lt_uchar cp, int input_mode,
     return 1;
   }
 
-  /* Standalone control byte (Ctrl+letter etc.): termbox2 model -> key = byte,
-   * ch = 0, mod = 0, matching POSIX. */
+  /* Ctrl+letter, modern model: the console keeps the letter virtual-key
+   * (VK_I is distinct from VK_TAB) even though uChar collapsed to a control byte,
+   * so report it disambiguated as ch=lowercase + the held modifiers, matching
+   * POSIX+kitty - instead of the ambiguous control byte (Ctrl+I vs Tab, Ctrl+M
+   * vs Enter). Gated on cp being the Ctrl+letter control char (0x01-0x1A) AND a
+   * letter VK, which is AltGr-safe: AltGr+letter yields a printable char, not a
+   * control byte, so it never reaches here. The real Tab/Enter/Backspace keys
+   * have their own VKs and were handled by lt__win_vk_to_lt_key above. Compat
+   * mode keeps the termbox2 control-byte collapse below. */
+  if (!compat && cp >= 0x01 && cp <= 0x1A && k->wVirtualKeyCode >= 'A' &&
+      k->wVirtualKeyCode <= 'Z') {
+    ev->ch = (lt_uchar)(k->wVirtualKeyCode + 0x20); /* VK 'A'..'Z' -> 'a'..'z' */
+    ev->key = 0;
+    /* ev->mod already carries CTRL (+ SHIFT/ALT) from the control-key state. */
+    return 1;
+  }
+
+  /* Standalone control byte (Ctrl+<non-letter>, or any Ctrl+letter in compat
+   * mode): termbox2 model -> key = byte, ch = 0, mod = 0, matching POSIX. */
   if (cp != 0 && (cp < 0x20 || cp == 0x7F)) {
     ev->mod = 0;
     ev->key = (uint16_t)cp;

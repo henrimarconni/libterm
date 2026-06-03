@@ -90,12 +90,41 @@ int main(void) {
   assert(ev.ch == (lt_uchar)'a');
   assert(ev.key == 0);
 
-  /* Control byte (Ctrl+C): termbox2 model -> key = byte, ch = 0, mod = 0. */
+  /* Ctrl+letter, modern model: disambiguated via the virtual-key to
+   * ch=lowercase + CTRL (key=0), matching POSIX+kitty. Ctrl+C -> ch='c'+CTRL. */
   KEY_EVENT_RECORD ctrlc = mk('C', 0, 0x03, LEFT_CTRL_PRESSED, TRUE, 1);
   assert(lt__win_key_event(&ctrlc, 0x03, 0, &ev) == 1);
+  assert(ev.ch == (lt_uchar)'c');
+  assert(ev.key == 0);
+  assert(ev.mod == LT_MOD_CTRL);
+
+  /* Ctrl+letter, compat model: termbox2 control-byte collapse (key=0x03). */
+  assert(lt__win_key_event(&ctrlc, 0x03, LT_INPUT_COMPAT, &ev) == 1);
   assert(ev.key == 0x03);
   assert(ev.ch == 0);
   assert(ev.mod == 0);
+
+  /* Ctrl+I is disambiguated to ch='i'+CTRL (NOT Tab) in the modern model -
+   * the console keeps VK_I distinct from VK_TAB. */
+  KEY_EVENT_RECORD ctrli = mk('I', 0, 0x09, LEFT_CTRL_PRESSED, TRUE, 1);
+  assert(lt__win_key_event(&ctrli, 0x09, 0, &ev) == 1);
+  assert(ev.ch == (lt_uchar)'i');
+  assert(ev.key == 0);
+  assert(ev.mod == LT_MOD_CTRL);
+
+  /* The real Tab key (VK_TAB) is unaffected -> LT_KEY_TAB. */
+  KEY_EVENT_RECORD realtab = mk(VK_TAB, 0, 0x09, 0, TRUE, 1);
+  assert(lt__win_key_event(&realtab, 0x09, 0, &ev) == 1);
+  assert(ev.key == LT_KEY_TAB);
+  assert(ev.ch == 0);
+
+  /* Ctrl+Shift+A -> ch='a' (lowercase base) + CTRL|SHIFT. */
+  KEY_EVENT_RECORD csa =
+      mk('A', 0, 0x01, LEFT_CTRL_PRESSED | SHIFT_PRESSED, TRUE, 1);
+  assert(lt__win_key_event(&csa, 0x01, 0, &ev) == 1);
+  assert(ev.ch == (lt_uchar)'a');
+  assert(ev.key == 0);
+  assert(ev.mod == (LT_MOD_CTRL | LT_MOD_SHIFT));
 
   return 0;
 }
