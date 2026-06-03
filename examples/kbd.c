@@ -179,6 +179,14 @@ static struct lt_event
 static int g_have_ev; /* 0 until the first event arrives */
 static int g_insp_y;  /* top row of the inspector, set by layout() */
 
+/* Inferred input model (POSIX). There is no public call to ask whether the
+ * kitty keyboard protocol is actually live — negotiation only means we *asked*,
+ * and the terminal may ignore it — so we infer it HONESTLY from events the
+ * legacy control-byte model cannot produce. See observe_model(). */
+enum input_model { MODEL_UNKNOWN, MODEL_KITTY, MODEL_LEGACY };
+static enum input_model g_model = MODEL_UNKNOWN;
+static const char *g_model_why = "";
+
 /* ---- text helpers ---- */
 
 static int draw_text(int x, int y, const char *s, lt_attr fg, lt_attr bg) {
@@ -464,11 +472,94 @@ static void clear_line(int y) {
     lt_set_cell(x, y, (uint32_t)' ', LT_DEFAULT, LT_DEFAULT);
 }
 
+/* Infer the input model from a real event. Some events are impossible in the
+ * legacy control-byte model and therefore prove the modern kitty protocol is
+ * live: a key REPEAT/RELEASE action, a bare-modifier key, or a printable letter
+ * that still carries Ctrl/Shift (legacy folds Shift into the case and Ctrl into
+ * a bare control byte, dropping the modifier — Alt is excluded since libterm
+ * folds ESC+key to Alt even on legacy terminals). The opposite tell — a
+ * Ctrl+letter that arrives as a bare control byte (ch=0, mod=0) — is the legacy
+ * collapse the kitty protocol removes: it is exactly why Ctrl+I looks like Tab,
+ * Ctrl+M like Enter, and Ctrl+J like LF. On Windows there is no kitty protocol;
+ * draw_model_line() reports the native console there instead of inferring. */
+static void observe_model(const struct lt_event *e) {
+  if (e->type != LT_EVENT_KEY)
+    return;
+  if (e->action == LT_KEY_REPEAT) {
+    g_model = MODEL_KITTY;
+    g_model_why = "repeat event";
+    return;
+  }
+  if (e->action == LT_KEY_RELEASE) {
+    g_model = MODEL_KITTY;
+    g_model_why = "release event";
+    return;
+  }
+  if ((e->key >= LT_KEY_LEFT_SHIFT && e->key <= LT_KEY_RIGHT_SUPER) ||
+      e->key == LT_KEY_CAPS_LOCK) {
+    g_model = MODEL_KITTY;
+    g_model_why = "bare-modifier key";
+    return;
+  }
+  int letter = (e->ch >= 'a' && e->ch <= 'z') || (e->ch >= 'A' && e->ch <= 'Z');
+  if (letter && (e->mod & (LT_MOD_CTRL | LT_MOD_SHIFT))) {
+    g_model = MODEL_KITTY;
+    g_model_why = "letter carrying a modifier";
+    return;
+  }
+  /* Legacy tell: Ctrl+letter collapsed to a bare control byte (the Ctrl+I/Tab,
+   * Ctrl+J/LF, Ctrl+M/Enter ambiguity). Skip the three that legitimately ARE
+   * named keys. Never downgrade once kitty has been confirmed. */
+  if (g_model != MODEL_KITTY && e->ch == 0 && e->mod == 0 &&
+      e->key >= LT_KEY_CTRL_A && e->key <= LT_KEY_CTRL_Z &&
+      e->key != LT_KEY_BACKSPACE && e->key != LT_KEY_TAB &&
+      e->key != LT_KEY_ENTER) {
+    g_model = MODEL_LEGACY;
+    g_model_why = "Ctrl+letter collapsed";
+  }
+}
+
+/* Persistent one-line input-model status (bold). Honest: on Windows it names
+ * the native console source; on POSIX it reports the inferred model. */
+static void draw_model_line(int y) {
+  clear_line(y);
+#ifdef _WIN32
+  /* libterm's modern model on Windows reconstructs Ctrl+letter from the console
+   * virtual-key (VK_I stays distinct from VK_TAB even though uChar collapsed to
+   * 0x09), so Ctrl+I arrives as ch='i'+CTRL, not Tab — the same disambiguation
+   * kitty gives on POSIX. (LT_INPUT_COMPAT restores the control-byte collapse.) */
+  draw_text(LEFT_MARGIN, y,
+            "input model: Win32 console (native, modern) - Ctrl+letter -> "
+            "ch+CTRL",
+            LT_DEFAULT | LT_BOLD, LT_DEFAULT);
+#else
+  char buf[110];
+  const char *s;
+  switch (g_model) {
+  case MODEL_KITTY:
+    snprintf(buf, sizeof buf,
+             "input model: kitty protocol ACTIVE - confirmed by %s",
+             g_model_why);
+    s = buf;
+    break;
+  case MODEL_LEGACY:
+    s = "input model: legacy control-byte (Ctrl+letter collapsed) - not kitty";
+    break;
+  default:
+    s = "input model: modern (kitty negotiated) - unconfirmed; press Shift+a "
+        "letter";
+    break;
+  }
+  draw_text(LEFT_MARGIN, y, s, LT_DEFAULT | LT_BOLD, LT_DEFAULT);
+#endif
+}
+
 static void draw_inspector(void) {
   int y = g_insp_y;
   clear_line(y);
   clear_line(y + 1);
   clear_line(y + 2);
+  draw_model_line(y + 3); /* persistent input-model status (kitty/legacy/Win32) */
   draw_text(LEFT_MARGIN, y, "last libterm event (raw lt_peek_event fields):",
             LT_DEFAULT | LT_BOLD, LT_DEFAULT);
   if (!g_have_ev) {
@@ -572,7 +663,7 @@ static void layout(void) {
   if (g_need_w < LEFT_MARGIN + INSP_W)
     g_need_w = LEFT_MARGIN + INSP_W;
   g_insp_y = KB_TOP + NROWS * CAP_H + 1; /* one blank row below the keyboard */
-  g_need_h = g_insp_y + 3 + 1;           /* inspector is 3 lines */
+  g_need_h = g_insp_y + 4 + 1; /* inspector: 3 event lines + 1 model line */
 }
 
 /* ---- event matching ---- */
@@ -686,6 +777,7 @@ int main(void) {
         break;
       g_last_ev = ev; /* record every real event for the inspector */
       g_have_ev = 1;
+      observe_model(&ev); /* update the inferred input-model status (POSIX) */
       if (ev.type == LT_EVENT_RESIZE) {
         draw_all(depth); /* redraws keyboard + inspector for the new size */
       } else {
