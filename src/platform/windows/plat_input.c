@@ -70,75 +70,59 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
       return LT_OK;
     }
 
+    if (rec.EventType == MOUSE_EVENT) {
+      /* Only surface mouse events when the consumer asked for them. */
+      if (!(lt__g.input_mode & LT_INPUT_MOUSE))
+        continue;
+      lt__win_pending_high = 0;
+
+      SHORT vx = 0, vy = 0;
+      CONSOLE_SCREEN_BUFFER_INFO csbi;
+      HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+      if (out != NULL && out != INVALID_HANDLE_VALUE &&
+          GetConsoleScreenBufferInfo(out, &csbi)) {
+        vx = csbi.srWindow.Left;
+        vy = csbi.srWindow.Top;
+      }
+
+      if (lt__win_mouse_event(&rec.Event.MouseEvent, vx, vy, ev))
+        return LT_OK;
+      continue;
+    }
+
     if (rec.EventType != KEY_EVENT)
       continue;
 
     KEY_EVENT_RECORD kev = rec.Event.KeyEvent;
-    if (!kev.bKeyDown)
-      continue;
-
-    memset(ev, 0, sizeof(struct lt_event));
-    ev->type = LT_EVENT_KEY;
-
-    if (kev.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
-      ev->mod |= LT_MOD_CTRL;
-
-    if (kev.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED))
-      ev->mod |= LT_MOD_ALT;
-
-    if (kev.dwControlKeyState & (SHIFT_PRESSED))
-      ev->mod |= LT_MOD_SHIFT;
-
-    WORD mapped = lt__win_vk_to_lt_key(kev.wVirtualKeyCode);
-    if (mapped != 0) {
-      lt__win_pending_high = 0;
-      ev->key = mapped;
-      return LT_OK;
-    }
-
     WCHAR ch16 = kev.uChar.UnicodeChar;
 
-    /* termbox2 model: a control character that isn't a named key (Ctrl+letter
-     * etc.) is reported as a key code with ch == 0 and no separate modifier,
-     * matching POSIX. Named keys handled above keep their dwControlKeyState
-     * modifiers. */
-    if (ch16 != 0 && (ch16 < 0x20 || ch16 == 0x7F)) {
-      lt__win_pending_high = 0;
-      ev->mod = 0;
-      ev->key = (uint16_t)ch16;
-      ev->ch = 0;
-      return LT_OK;
-    }
-
+    /* Surrogate assembly spans records, so it stays in the loop. A lone high
+     * surrogate is latched (on key-down) and never emitted on its own. */
     if (ch16 >= 0xD800 && ch16 <= 0xDBFF) {
-      lt__win_pending_high = ch16;
+      if (kev.bKeyDown)
+        lt__win_pending_high = ch16;
       continue;
     }
 
+    lt_uchar cp = 0;
     if (ch16 >= 0xDC00 && ch16 <= 0xDFFF) {
-      if (lt__win_pending_high == 0) {
-        ev->ch = 0xFFFD;
-        lt__win_pending_high = 0;
-      } else {
-        lt_uchar cp = (lt_uchar)((lt__win_pending_high - 0xD800) << 10);
+      if (lt__win_pending_high != 0) {
+        cp = (lt_uchar)((lt__win_pending_high - 0xD800) << 10);
         cp |= (lt_uchar)(ch16 - 0xDC00);
         cp += 0x10000;
-        ev->ch = cp;
         lt__win_pending_high = 0;
+      } else {
+        cp = 0xFFFD;
       }
-
-      return LT_OK;
-    }
-
-    if (ch16 != 0) {
+    } else {
       if (lt__win_pending_high != 0)
         lt__win_pending_high = 0;
-
-      ev->ch = (lt_uchar)ch16;
-      return LT_OK;
+      cp = (lt_uchar)ch16;
     }
 
-    continue;
+    if (lt__win_key_event(&kev, cp, lt__g.input_mode, ev))
+      return LT_OK;
+    /* Record produced no event (e.g. a key-up in compat mode); keep waiting. */
   }
 
   return LT_ERR_NO_EVENT;
@@ -150,4 +134,22 @@ int lt__plat_get_fds(int *ttyfd, int *resizefd) {
   (void)ttyfd;
   (void)resizefd;
   return LT_ERR_UNSUPPORTED_TERM;
+}
+
+int lt__plat_set_mouse(int enable) {
+  HANDLE in = lt__win_input_handle();
+  if (in == NULL || in == INVALID_HANDLE_VALUE)
+    return LT_OK; /* best-effort: nothing to toggle */
+
+  DWORD mode = 0;
+  if (!GetConsoleMode(in, &mode))
+    return LT_OK;
+
+  if (enable)
+    mode |= ENABLE_MOUSE_INPUT;
+  else
+    mode &= ~(DWORD)ENABLE_MOUSE_INPUT;
+
+  (void)SetConsoleMode(in, mode);
+  return LT_OK;
 }

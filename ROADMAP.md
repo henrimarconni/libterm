@@ -127,7 +127,7 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 |---|---|---|
 | `TB_EVENT_KEY` | `LT_EVENT_KEY` | declared, emitted (POSIX [~], Windows [x]) |
 | `TB_EVENT_RESIZE` | `LT_EVENT_RESIZE` | declared; emitted on both platforms (Windows console resize event, POSIX SIGWINCH/self-pipe path) |
-| `TB_EVENT_MOUSE` | `LT_EVENT_MOUSE` | declared; emitted on POSIX (SGR 1006 reports → button in `key`, 0-based coords in `x`/`y`, modifiers in `mod`); not emitted on Windows |
+| `TB_EVENT_MOUSE` | `LT_EVENT_MOUSE` | declared; emitted on POSIX (SGR 1006 reports → button in `key`, 0-based coords in `x`/`y`, modifiers in `mod`) and on Windows (`MOUSE_EVENT_RECORD` → same fields, gated on `LT_INPUT_MOUSE`; tested in `tests/test_win_mouse.c`) |
 
 ### Keys (`TB_KEY_*` → `LT_KEY_*`)
 
@@ -139,10 +139,10 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | `ENTER` / `BACKSPACE` / `TAB` / `SPACE` | [x] | [x] | ENTER/TAB/BACKSPACE now report as key codes (termbox2 control-byte model); SPACE is a printable char (`ch == 0x20`) |
 | F1–F12 | [x] (common xterm CSI/SS3 sequences) | [x] |
 | `INSERT` / `DELETE` / `HOME` / `END` / `PGUP` / `PGDN` | [x] | [x] |
-| Ctrl+letter (`LT_KEY_CTRL_A` … termbox2 set) | [x] | [x] | A standalone control byte (`0x00-0x1F`, `0x7F`) → `ev->key` = the byte, `ch == 0`, `mod == 0`, identically on both platforms. `LT_KEY_CTRL_*` declared in `libterm.h`; POSIX byte mapping unit-tested in `tests/test_posix_input_parse.c` |
-| Back-tab (Shift+Tab, `LT_KEY_BACK_TAB`) | [x] CSI `Z` → `LT_KEY_BACK_TAB` | [ ] | POSIX parses `\x1b[Z` (per tmux + kitty); declared `libterm.h`, unit-tested. Windows pending |
-| CSI-u modern key encoding (`\x1b[cp;mods u`) | [x] codepoint → `ev->ch`, modifier bitfield → `ev->mod`, event type → `ev->action` | [ ] | POSIX parses the full kitty/fixterms CSI-u form via the shared decoder (`src/shared/keymap.c`, `external/kitty/docs/keyboard-protocol.rst`): `number` is the Unicode codepoint, `modifiers` is `1 + bitmask` (shift/alt/ctrl decoded), and the event-type sub-parameter maps to `LT_KEY_PRESS`/`REPEAT`/`RELEASE`. Unit-tested in `tests/test_posix_input_parse.c`. Windows pending |
-| Bare-modifier keys (`LT_KEY_LEFT_SHIFT` … `LT_KEY_RIGHT_SUPER`) | [x] kitty functional codes → `ev->key` | [ ] | **Deliberate divergence from termbox2** (no equivalent there). On kitty-capable terminals a modifier pressed *alone* arrives as a functional CSI-u code and is reported as the corresponding `LT_KEY_*` constant with `ev->action`. Decoded in `src/shared/keymap.c`. Legacy terminals send zero bytes for these and cannot report them. Windows pending |
+| Ctrl+letter (`LT_KEY_CTRL_A` … termbox2 set) | [x] | [x] | In **compat** mode (`LT_INPUT_COMPAT`) a standalone control byte (`0x00-0x1F`, `0x7F`) → `ev->key` = the byte, `ch == 0`, `mod == 0`, identically on both platforms (termbox2 model). In the **modern** model Ctrl+letter is disambiguated to `ch` = lowercase letter + `LT_MOD_CTRL` (`key == 0`): POSIX via the kitty CSI-u codepoint, Windows by reconstructing from the console virtual-key (`VK_I` stays distinct from `VK_TAB`), so `Ctrl+I` is no longer indistinguishable from Tab. **Windows disambiguation is best-effort** — it relies on the console reporting the letter virtual-key, which the classic console (conhost) does; **ConPTY / Windows Terminal pre-collapse `Ctrl+I`→Tab (`VK_TAB`) and `Ctrl+J`→Enter (`VK_RETURN`) at the virtual-key level**, so the letter is unrecoverable there, exactly as on a POSIX legacy terminal. `LT_KEY_CTRL_*` declared in `libterm.h`; POSIX byte mapping unit-tested in `tests/test_posix_input_parse.c`, Windows disambiguation in `tests/test_win_key.c` |
+| Back-tab (Shift+Tab, `LT_KEY_BACK_TAB`) | [x] CSI `Z` → `LT_KEY_BACK_TAB` | [x] | POSIX parses `\x1b[Z` (per tmux + kitty); Windows maps `VK_TAB` + `SHIFT_PRESSED` → `LT_KEY_BACK_TAB`. Both unit-tested (`tests/test_posix_input_parse.c`, `tests/test_win_key.c`) |
+| Modern key outcome (codepoint + modifiers + `ev->action`) | [x] via CSI-u (`\x1b[cp;mods u`) | [x] via `KEY_EVENT_RECORD` | POSIX parses the full kitty/fixterms CSI-u form via the shared decoder (`src/shared/keymap.c`): codepoint → `ev->ch`, `1 + bitmask` → `ev->mod`, event-type → `ev->action`. Windows reads the same outcome directly from the console record (no escape parsing): codepoint → `ev->ch`, `dwControlKeyState` → `ev->mod`, key-down/repeat/up → `LT_KEY_PRESS`/`REPEAT`/`RELEASE`. Both unit-tested (`tests/test_posix_input_parse.c`, `tests/test_win_key.c`) |
+| Bare-modifier keys (`LT_KEY_LEFT_SHIFT` … `LT_KEY_RIGHT_SUPER`) | [x] kitty functional codes → `ev->key` | [x] modifier VKs → `ev->key` | **Deliberate divergence from termbox2** (no equivalent there). POSIX decodes the functional CSI-u codes (`src/shared/keymap.c`); Windows maps the modifier virtual-key codes (`VK_SHIFT/CONTROL/MENU/LWIN/RWIN/CAPITAL`, left/right via scan code + `ENHANCED_KEY`) → the corresponding `LT_KEY_*` with `ev->action`, modern model only. Legacy POSIX terminals send zero bytes for these; Windows and kitty report them. Unit-tested (`tests/test_posix_input_parse.c`, `tests/test_win_key.c`) |
 
 ### Modifiers (`TB_MOD_*` → `LT_MOD_*`)
 
@@ -151,7 +151,7 @@ Function/named keys (`F1`–`F12`, `INSERT`, `DELETE`, `HOME`, `END`, `PGUP`, `P
 | `TB_MOD_ALT` | `LT_MOD_ALT` | [~] | [x] |
 | `TB_MOD_CTRL` | `LT_MOD_CTRL` | [~] | [x] |
 | `TB_MOD_SHIFT` | `LT_MOD_SHIFT` | [~] | [x] |
-| `TB_MOD_MOTION` | `LT_MOD_MOTION` | [x] | [ ] |
+| `TB_MOD_MOTION` | `LT_MOD_MOTION` | [x] | [x] |
 
 On **kitty-capable terminals** (negotiated by default), POSIX now delivers `LT_MOD_ALT`/`LT_MOD_CTRL`/`LT_MOD_SHIFT` on **all keys** — including bare-modifier presses, Shift+letter, and Ctrl+letter — via the CSI-u path in the shared decoder (`src/shared/keymap.c`). On **legacy-only terminals** these are still partial (`[~]`): modifiers ride only CSI-encoded keys (arrows, F-keys, nav) since the terminal folds Shift/Ctrl+letter before libterm sees it. POSIX mouse reports also set `LT_MOD_SHIFT`/`LT_MOD_CTRL`/`LT_MOD_ALT`/`LT_MOD_MOTION` from the SGR button-code modifier bits (4/8/16/32); `LT_MOD_MOTION` (drag) is producible only via mouse, hence `[x]` on POSIX.
 
@@ -205,7 +205,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | `lt_present` actually paints the terminal | [x] buffered ANSI output | [x] cursor jump (only on discontinuity) + UTF-8 emit per changed cell, buffered `WriteFile` |
 | ASCII char keys via `lt_poll_event` / `lt_peek_event` | [~] UTF-8 assembly path now active with `U+FFFD` fallback; still needs broader parity validation | [x] disambiguated via `KEY_EVENT_RECORD` |
 | Named keys (F1–F12, arrows, Home/End/PgUp/PgDn, Ins/Del) | [x] common xterm CSI/SS3 coverage (terminal-dependent beyond that set) | [x] full set via `plat_keys.c` |
-| Modifier bits in `ev->mod` | [~] CSI modifier suffixes mapped for POSIX escape-key families; coverage is not yet universal | [x] from `dwControlKeyState` |
+| Modifier bits in `ev->mod` | [~] CSI modifier suffixes mapped for POSIX escape-key families; coverage is not yet universal | [x] from `dwControlKeyState` on every key; `ev->action` press/repeat/release reported in the modern model |
 | UTF-8 input round-trip (BMP + supplementary) | [x] multi-byte assembly + strict decode with `U+FFFD` fallback; malformed sequences now **resync** (a non-continuation byte after a bad lead is replayed as its own event, not swallowed). End-to-end pty test `tests/test_posix_input_utf8.c` + decode boundary tests in `tests/test_utf8.c` | [x] surrogate pairs combined before emit; latch cleared on every non-completing return path |
 | UTF-8 output round-trip in render path | [x] `lt__utf8_encode` path active | [x] `lt__utf8_encode` writes 1–4 bytes |
 | `LT_EVENT_RESIZE` delivered exactly once per visible-size change | [~] SIGWINCH/self-pipe enabled; semantics still under parity validation | [x] `WINDOW_BUFFER_SIZE_EVENT` filtered for spurious events |
@@ -216,7 +216,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
 | SGR / color emission | [x] byte-tested via pty (`tests/test_posix_sgr_output.c`) | [x] shared `lt__emit_sgr` (`src/shared/sgr.c`); colors visually confirmed in Windows Terminal via the bench SGR workloads (`bench/bench_present.c`, real `WriteFile` output) + automated byte test (`tests/test_win_sgr_output.c`) |
 | Runtime color-depth detection (`lt_detect_color_depth`) | [x] `$COLORTERM`/`$TERM` → `LT_OUTPUT_*` ceiling; hermetic `setenv` test (`tests/test_detect_color_depth.c`), wired into `examples/truecolor.c` | [x] same standard-C path (test harness POSIX-only) |
-| Mouse events | [~] SGR (1006) reports parsed into `LT_EVENT_MOUSE` (button/wheel/release, 0-based coords, shift/ctrl/alt/motion mods); tracking enabled via `lt_set_input_mode(LT_INPUT_MOUSE)`, disabled on shutdown. Parser unit-tested incl. malformed/overflow rejection (`tests/test_posix_input_parse.c`); live-terminal click verification still pending | [ ] pending |
+| Mouse events | [~] SGR (1006) reports parsed into `LT_EVENT_MOUSE` (button/wheel/release, 0-based coords, shift/ctrl/alt/motion mods); tracking enabled via `lt_set_input_mode(LT_INPUT_MOUSE)`, disabled on shutdown. Parser unit-tested incl. malformed/overflow rejection (`tests/test_posix_input_parse.c`); live-terminal click verification still pending | [~] `MOUSE_EVENT_RECORD` parsed into `LT_EVENT_MOUSE` (button/wheel/release, viewport-relative 0-based coords, shift/ctrl/alt/motion mods); `ENABLE_MOUSE_INPUT` toggled via the `lt__plat_set_mouse` hook. Mapper unit-tested (`tests/test_win_mouse.c`); live-terminal click verification still pending |
 
 ---
 

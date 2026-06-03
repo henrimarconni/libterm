@@ -726,3 +726,12 @@ int lt__plat_get_fds(int *ttyfd, int *resizefd) {
     *resizefd = lt__posix_resize_read_fd();
   return LT_OK;
 }
+
+int lt__plat_set_mouse(int enable) {
+  if (enable) {
+    static const char on[] = "\x1b[?1000h\x1b[?1006h";
+    return lt__plat_write(on, sizeof(on) - 1);
+  }
+  static const char off[] = "\x1b[?1006l\x1b[?1000l";
+  return lt__plat_write(off, sizeof(off) - 1);
+}
