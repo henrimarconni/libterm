@@ -262,6 +262,18 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 **Payoff.** Moves the POSIX `LT_MOD_ALT/CTRL/SHIFT` rows toward `[x]` for *all* keys (not just CSI families), enables bare-modifier and Shift+letter detection, adds key-release/repeat, and resolves the "inherently lossy" caveat in Known blocker #2. `examples/kbd.c` (the on-screen keyboard + live event inspector) is the natural development harness — once libterm emits the bits, its inspector and modifier caps light up for every combination.
 
+### Kitty color protocol (querying / theming)
+
+> **Status: wanted, not yet scoped.** Placeholder for a future progressive enhancement, beyond termbox2.
+
+**Idea.** Let an app learn the terminal's actual colors — query the default foreground/background and the palette (standard `OSC 10` / `11` / `4` with a `?`, plus kitty's extended `OSC 21`), so it can detect a **light vs dark background** and theme itself accordingly. Optionally, *set* terminal colors and push/pop a **color stack** to recolor the terminal and restore it cleanly on exit (the kitty-specific part).
+
+**Notes / open questions.**
+- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — same shape as the kitty keyboard negotiation above.
+- **POSIX-first.** Classic-console / ConPTY support for these OSC color queries is limited, so this would carry a documented Windows caveat (as the input model does).
+- Complements `lt_detect_color_depth` (which reports *how many* colors, but nothing about light/dark or the actual palette).
+- Exact escape codes and the public API surface to be pinned at design time, per the kitty color-control spec.
+
 ---
 
 ## Out of scope for libterm (intentional divergence from termbox2)
