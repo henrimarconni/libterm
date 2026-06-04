@@ -4,7 +4,7 @@
  * doesn't answer (LT_ERR_NO_EVENT after the timeout), assume a dark
  * background and theme accordingly. The panel is themed by the verdict, so
  * running it on a light vs dark terminal profile renders differently.
- * Press any key to quit.
+ * Press q to quit.
  *
  * Windows note: queries answer natively from the console color table
  * (GetConsoleScreenBufferInfoEx) — immediate, no escape round-trip.
@@ -110,12 +110,14 @@ int main(void) {
   lt_print(2, 8, t->body_fg, t->body_bg,
            "run it on a light and a dark terminal profile to compare.");
 
-  lt_print(2, 10, t->accent_fg | LT_BOLD, t->accent_bg,
-           "press any key to exit");
+  lt_print(2, 10, t->accent_fg | LT_BOLD, t->accent_bg, "press q to exit");
   lt_present();
 
   struct lt_event ev;
-  lt_poll_event(&ev);
+  while (lt_poll_event(&ev) == LT_OK) {
+    if (ev.type == LT_EVENT_KEY && (ev.ch == 'q' || ev.ch == 'Q'))
+      break;
+  }
 
   lt_shutdown();
   return 0;
