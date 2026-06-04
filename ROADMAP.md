@@ -268,18 +268,18 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 **Idea.** Let an app learn the terminal's actual colors so it can detect a **light vs dark background** and theme itself accordingly. The valuable core is *not* kitty-specific: querying the default foreground/background and the palette is plain `OSC 10` / `11` / `4` with a `?`, supported broadly (xterm, kitty, foot, alacritty, WezTerm, ghostty, iTerm2). Kitty's extended `OSC 21` layers on top as a progressive enhancement — batch query/set, special colors, and a push/pop **color stack** to recolor the terminal and restore it cleanly on exit. Same shape as the keyboard work: portable base, kitty-enhanced.
 
-**Likely API surface (to be pinned at design time).**
-- Query fg / bg / palette index with a timeout (replies are X11-style `rgb:rrrr/gggg/bbbb`, 16-bit per channel, terminated by BEL *or* ST — terminals differ).
-- A `lt_is_dark_background()`-style convenience (luminance threshold on the bg query) — what most callers actually want.
-- A **theme-changed event**: mode `2031` / `CSI ? 996 n` is the newer cross-terminal "color scheme notification" mechanism (kitty, ghostty, foot). `OSC 11` answers point-in-time; mode 2031 delivers *change events* when the user flips OS theme mid-session — falls out almost free once the query path exists, and libterm already has the event loop to surface it.
-- Color *setting* exposed only via the kitty color stack (push/pop), gated on detection — arbitrary palette writes are how apps leave terminals in a broken state, so not offering them is a feature.
+**API surface (slice 1 shipped: queries + dark-bg; rest planned).**
+- *Shipped:* query fg / bg / palette index with a timeout (replies are X11-style `rgb:rrrr/gggg/bbbb`, 16-bit per channel, terminated by BEL *or* ST — terminals differ).
+- *Shipped:* `lt_is_dark_background()` convenience (luminance threshold on the bg query) — what most callers actually want.
+- *Planned:* a **theme-changed event**: mode `2031` / `CSI ? 996 n` is the newer cross-terminal "color scheme notification" mechanism (kitty, ghostty, foot). `OSC 11` answers point-in-time; mode 2031 delivers *change events* when the user flips OS theme mid-session — falls out almost free once the query path exists, and libterm already has the event loop to surface it.
+- *Planned:* color *setting* exposed only via the kitty color stack (push/pop), gated on detection — arbitrary palette writes are how apps leave terminals in a broken state, so not offering them is a feature.
 
 **Notes / open questions.**
 - Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — the machinery already exists from the kitty keyboard negotiation above.
 - **POSIX-first.** Classic-console / ConPTY support for these OSC color queries is limited, so this would carry a documented Windows caveat (as the input model does).
 - **Multiplexers.** tmux answers `OSC 10`/`11` itself (with its own idea of colors), and passthrough for `OSC 21` is unreliable — needs a documented caveat next to the Windows one.
 - Complements `lt_detect_color_depth` (which reports *how many* colors, but nothing about light/dark or the actual palette).
-- Exact escape codes and the public API surface to be pinned at design time, per the kitty color-control spec.
+- Exact escape codes and the public API surface for the shipped slice are pinned in `docs/specs/2026-06-04-color-query-design.md`; the remaining slices (mode 2031 events, kitty color stack) are still to be designed.
 
 ---
 
