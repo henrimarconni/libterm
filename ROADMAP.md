@@ -262,15 +262,22 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 **Payoff.** Moves the POSIX `LT_MOD_ALT/CTRL/SHIFT` rows toward `[x]` for *all* keys (not just CSI families), enables bare-modifier and Shift+letter detection, adds key-release/repeat, and resolves the "inherently lossy" caveat in Known blocker #2. `examples/kbd.c` (the on-screen keyboard + live event inspector) is the natural development harness — once libterm emits the bits, its inspector and modifier caps light up for every combination.
 
-### Kitty color protocol (querying / theming)
+### Color querying + theming (kitty-enhanced)
 
 > **Status: wanted, not yet scoped.** Placeholder for a future progressive enhancement, beyond termbox2.
 
-**Idea.** Let an app learn the terminal's actual colors — query the default foreground/background and the palette (standard `OSC 10` / `11` / `4` with a `?`, plus kitty's extended `OSC 21`), so it can detect a **light vs dark background** and theme itself accordingly. Optionally, *set* terminal colors and push/pop a **color stack** to recolor the terminal and restore it cleanly on exit (the kitty-specific part).
+**Idea.** Let an app learn the terminal's actual colors so it can detect a **light vs dark background** and theme itself accordingly. The valuable core is *not* kitty-specific: querying the default foreground/background and the palette is plain `OSC 10` / `11` / `4` with a `?`, supported broadly (xterm, kitty, foot, alacritty, WezTerm, ghostty, iTerm2). Kitty's extended `OSC 21` layers on top as a progressive enhancement — batch query/set, special colors, and a push/pop **color stack** to recolor the terminal and restore it cleanly on exit. Same shape as the keyboard work: portable base, kitty-enhanced.
+
+**Likely API surface (to be pinned at design time).**
+- Query fg / bg / palette index with a timeout (replies are X11-style `rgb:rrrr/gggg/bbbb`, 16-bit per channel, terminated by BEL *or* ST — terminals differ).
+- A `lt_is_dark_background()`-style convenience (luminance threshold on the bg query) — what most callers actually want.
+- A **theme-changed event**: mode `2031` / `CSI ? 996 n` is the newer cross-terminal "color scheme notification" mechanism (kitty, ghostty, foot). `OSC 11` answers point-in-time; mode 2031 delivers *change events* when the user flips OS theme mid-session — falls out almost free once the query path exists, and libterm already has the event loop to surface it.
+- Color *setting* exposed only via the kitty color stack (push/pop), gated on detection — arbitrary palette writes are how apps leave terminals in a broken state, so not offering them is a feature.
 
 **Notes / open questions.**
-- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — same shape as the kitty keyboard negotiation above.
+- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — the machinery already exists from the kitty keyboard negotiation above.
 - **POSIX-first.** Classic-console / ConPTY support for these OSC color queries is limited, so this would carry a documented Windows caveat (as the input model does).
+- **Multiplexers.** tmux answers `OSC 10`/`11` itself (with its own idea of colors), and passthrough for `OSC 21` is unreliable — needs a documented caveat next to the Windows one.
 - Complements `lt_detect_color_depth` (which reports *how many* colors, but nothing about light/dark or the actual palette).
 - Exact escape codes and the public API surface to be pinned at design time, per the kitty color-control spec.
 
