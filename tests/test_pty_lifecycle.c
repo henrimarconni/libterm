@@ -4,9 +4,15 @@
 #include "libterm/libterm.h"
 
 #include <assert.h>
+#if defined(__APPLE__)
+#include <util.h> /* openpty lives here on macOS (no <pty.h>, no libutil) */
+#else
 #include <pty.h>
+#endif
 #include <string.h>
 #include <unistd.h>
+
+#include "pty_drain.h"
 
 int main(void) {
   int master = -1, slave = -1;
@@ -17,6 +23,8 @@ int main(void) {
 
   if (openpty(&master, &slave, NULL, NULL, &ws) != 0)
     return 77; /* CTest "skip" — no pty available in this environment */
+
+  pty_autodrain(master, slave);
 
   assert(lt_init_fd(slave) == LT_OK);
   assert(lt_init_fd(slave) == LT_ERR_INIT_ALREADY);

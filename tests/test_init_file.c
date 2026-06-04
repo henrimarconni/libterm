@@ -7,9 +7,15 @@
 
 #include <assert.h>
 #include <errno.h>
+#if defined(__APPLE__)
+#include <util.h> /* openpty lives here on macOS (no <pty.h>, no libutil) */
+#else
 #include <pty.h>
+#endif
 #include <string.h>
 #include <unistd.h>
+
+#include "pty_drain.h"
 
 int main(void) {
   /* NULL path is a hard arg error, regardless of platform. */
@@ -35,6 +41,8 @@ int main(void) {
   ws.ws_col = 80;
   if (openpty(&master, &slave, NULL, NULL, &ws) != 0)
     return 77; /* CTest skip */
+
+  pty_autodrain(master, slave);
 
   char name[256];
   if (ttyname_r(slave, name, sizeof name) != 0) {

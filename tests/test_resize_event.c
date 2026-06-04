@@ -11,7 +11,11 @@
 #include "libterm/libterm.h"
 
 #include <assert.h>
+#if defined(__APPLE__)
+#include <util.h> /* openpty lives here on macOS (no <pty.h>, no libutil) */
+#else
 #include <pty.h>
+#endif
 #include <signal.h>
 #include <string.h>
 #include <sys/ioctl.h>

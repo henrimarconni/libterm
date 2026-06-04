@@ -48,13 +48,14 @@ jobs:
   # warnings-as-errors (WAE) is enabled only where the tree is actually -Werror
   # clean. clang's -Wcast-align flags the unaligned-load SIMD intrinsic casts
   # (_mm256_loadu_si256 etc.) that gcc accepts, so clang+SIMD and the apple-clang
-  # neon build run with WAE OFF. The macOS job builds the library only: the test
-  # suite #includes <pty.h>, which is Linux-only (macOS exposes openpty via
-  # <util.h>), so ctest there needs a test-portability fix first.
+  # neon build run with WAE OFF. The macOS job runs the portable suite plus the
+  # pty canary (test_pty_lifecycle); the remaining pty tests are Apple-gated
+  # pending the macOS pty-test parity item in ROADMAP "Known blockers".
   # --------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -65,8 +66,8 @@ jobs:
           - { name: linux-gcc-avx512,   os: ubuntu-latest, cc: gcc,   simd: avx512, wae: 'ON',  run_tests: false, extra: '' }
           - { name: linux-clang-scalar, os: ubuntu-latest, cc: clang, simd: scalar, wae: 'ON',  run_tests: true,  extra: '' }
           - { name: linux-clang-avx2,   os: ubuntu-latest, cc: clang, simd: avx2,   wae: 'OFF', run_tests: true,  extra: '' }
-          # macOS arm64 / neon — builds the library (tests not yet macOS-portable).
-          - { name: macos-clang-neon,   os: macos-latest,  cc: clang, simd: auto,   wae: 'OFF', run_tests: false, extra: '-DLIBTERM_BUILD_TESTS=OFF -DLIBTERM_BUILD_EXAMPLES=OFF -DLIBTERM_BUILD_BENCH=OFF' }
+          # macOS arm64 / neon — runs the portable suite (examples/bench stay off).
+          - { name: macos-clang-neon,   os: macos-latest,  cc: clang, simd: auto,   wae: 'OFF', run_tests: true,  extra: '-DLIBTERM_BUILD_EXAMPLES=OFF -DLIBTERM_BUILD_BENCH=OFF' }
     env:
       CC: ${{ matrix.cc }}
     steps:
@@ -114,6 +115,21 @@ jobs:
             -DLIBTERM_BUILD_BENCH=OFF
       - name: Build
         run: cmake --build build-mingw --parallel
+
+  # --------------------------------------------------------------------------
+  # Install/export wiring: stage-install + find_package(Libterm) consumer,
+  # in both default (umbrella -> static) and shared-only configurations.
+  # --------------------------------------------------------------------------
+  install-smoke:
+    name: install-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Smoke-test install + find_package
+        run: bash tests/smoke_install.sh .
 
   # --------------------------------------------------------------------------
   # AddressSanitizer + UndefinedBehaviorSanitizer on the full test suite.
