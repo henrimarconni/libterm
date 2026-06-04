@@ -264,7 +264,7 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 ### Color querying + theming (kitty-enhanced)
 
-> **Status: wanted, not yet scoped.** Placeholder for a future progressive enhancement, beyond termbox2.
+> **Status: slice 1 shipped — `lt_query_color` + `lt_is_dark_background`.** POSIX does the OSC 10/11/4 round-trip (timeout-bounded, typed input preserved via a raw-byte pushback ring); Windows answers natively from `GetConsoleScreenBufferInfoEx` (palette indexes above 15 unsupported). Spec: `docs/specs/2026-06-04-color-query-design.md`. Remaining slices: mode 2031 theme-changed events and the kitty OSC 21 color stack.
 
 **Idea.** Let an app learn the terminal's actual colors so it can detect a **light vs dark background** and theme itself accordingly. The valuable core is *not* kitty-specific: querying the default foreground/background and the palette is plain `OSC 10` / `11` / `4` with a `?`, supported broadly (xterm, kitty, foot, alacritty, WezTerm, ghostty, iTerm2). Kitty's extended `OSC 21` layers on top as a progressive enhancement — batch query/set, special colors, and a push/pop **color stack** to recolor the terminal and restore it cleanly on exit. Same shape as the keyboard work: portable base, kitty-enhanced.
 
