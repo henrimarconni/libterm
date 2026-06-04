@@ -1,6 +1,7 @@
 #include "internal.h"
 #include "libterm/libterm.h"
 #include "platform.h"
+#include "win_internal.h"
 #include <string.h>
 
 #define WIN32_LEAN_AND_MEAN
@@ -155,4 +156,32 @@ int lt__plat_render_cell(int x, int y, const struct lt_cell *c) {
   }
 
   return lt__plat_write(utf8, (size_t)ub);
+}
+
+int lt__win_query_color_from_csbi(const CONSOLE_SCREEN_BUFFER_INFOEX *csbi,
+                                  int what, uint32_t *rgb) {
+  WORD idx;
+  if (what == LT_COLOR_DEFAULT_FG)
+    idx = csbi->wAttributes & 0xF;
+  else if (what == LT_COLOR_DEFAULT_BG)
+    idx = (csbi->wAttributes >> 4) & 0xF;
+  else if (what >= 0 && what <= 15)
+    idx = (WORD)what;
+  else
+    return LT_ERR_UNSUPPORTED_TERM;
+
+  COLORREF c = csbi->ColorTable[idx];
+  *rgb = ((uint32_t)GetRValue(c) << 16) | ((uint32_t)GetGValue(c) << 8) |
+         (uint32_t)GetBValue(c);
+  return LT_OK;
+}
+
+int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
+  (void)timeout_ms; /* native query: immediate, nothing to wait for */
+  HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+  CONSOLE_SCREEN_BUFFER_INFOEX csbi;
+  csbi.cbSize = sizeof(csbi);
+  if (!GetConsoleScreenBufferInfoEx(out, &csbi))
+    return LT_ERR;
+  return lt__win_query_color_from_csbi(&csbi, what, rgb);
 }

@@ -35,4 +35,12 @@ int lt__win_key_event(const KEY_EVENT_RECORD *k, lt_uchar cp, int input_mode,
 int lt__win_mouse_event(const MOUSE_EVENT_RECORD *m, SHORT viewport_left,
                         SHORT viewport_top, struct lt_event *ev);
 
+/* Map `what` (LT_COLOR_DEFAULT_FG / LT_COLOR_DEFAULT_BG / palette index)
+ * against an already-fetched console screen buffer info. Pure — tests drive
+ * it with a fabricated CSBI, no console needed. COLORREF is 0x00BBGGRR;
+ * the result is libterm's 0x00RRGGBB. Indexes above 15 return
+ * LT_ERR_UNSUPPORTED_TERM (the console color table has 16 entries). */
+int lt__win_query_color_from_csbi(const CONSOLE_SCREEN_BUFFER_INFOEX *csbi,
+                                  int what, uint32_t *rgb);
+
 #endif // LIBTERM_WIN_INTERNAL_H
