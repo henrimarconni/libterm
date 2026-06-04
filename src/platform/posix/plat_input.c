@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/select.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 /* Inter-byte grace period while assembling a multi-byte input sequence (escape
@@ -796,15 +795,6 @@ int lt__plat_set_mouse(int enable) {
   return lt__plat_write(off, sizeof(off) - 1);
 }
 
-/* Milliseconds for the query deadline. (gettimeofday lives in the base libc
- * namespace under -std=c11; CLOCK_MONOTONIC's clock_gettime would need a
- * feature-test macro the white-box test TU can't satisfy.) */
-static long long lt__posix_now_ms(void) {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
-
 int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
   int ttyfd = lt__posix_get_tty_fd();
   if (ttyfd < 0)
@@ -814,12 +804,15 @@ int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
    * BEL-terminated; replies may use BEL or ST and we accept both. */
   char q[24];
   int qlen;
-  if (what == LT_COLOR_DEFAULT_FG)
-    qlen = snprintf(q, sizeof(q), "\x1b]10;?\x07");
-  else if (what == LT_COLOR_DEFAULT_BG)
-    qlen = snprintf(q, sizeof(q), "\x1b]11;?\x07");
-  else
+  if (what == LT_COLOR_DEFAULT_FG) {
+    memcpy(q, "\x1b]10;?\x07", 7);
+    qlen = 7;
+  } else if (what == LT_COLOR_DEFAULT_BG) {
+    memcpy(q, "\x1b]11;?\x07", 7);
+    qlen = 7;
+  } else {
     qlen = snprintf(q, sizeof(q), "\x1b]4;%d;?\x07", what);
+  }
 
   int rc = lt__plat_write(q, (size_t)qlen);
   if (rc != LT_OK)
@@ -870,6 +863,7 @@ int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
     if (n == 0)
       return LT_ERR_NO_EVENT; /* EOF: no reply is coming */
 
+    bool reply_done = false;
     switch (st) {
     case SCAN:
       if (b == 0x1b)
@@ -891,10 +885,8 @@ int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
       break;
     case COLLECT:
       if (b == 0x07) { /* BEL-terminated reply */
-        if (!overflow &&
-            lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
-          return LT_OK;
-        st = SCAN; /* wrong number / malformed: keep waiting */
+        reply_done = true;
+        st = SCAN;
       } else if (b == 0x1b) {
         st = COLLECT_ESC;
       } else if (rlen < sizeof(reply)) {
@@ -905,12 +897,19 @@ int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
       break;
     case COLLECT_ESC:
       if (b == '\\') { /* ST-terminated reply */
-        if (!overflow &&
-            lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
-          return LT_OK;
+        reply_done = true;
+        st = SCAN;
+      } else {
+        st = SCAN; /* malformed ESC inside the payload */
       }
-      st = SCAN; /* terminated, or a malformed ESC inside the payload */
       break;
+    }
+
+    if (reply_done) {
+      if (!overflow &&
+          lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
+        return LT_OK;
+      /* wrong number / malformed / overlong: keep waiting for the deadline */
     }
   }
 }
