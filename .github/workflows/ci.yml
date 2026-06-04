@@ -116,6 +116,21 @@ jobs:
         run: cmake --build build-mingw --parallel
 
   # --------------------------------------------------------------------------
+  # Install/export wiring: stage-install + find_package(Libterm) consumer,
+  # in both default (umbrella -> static) and shared-only configurations.
+  # --------------------------------------------------------------------------
+  install-smoke:
+    name: install-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Smoke-test install + find_package
+        run: bash tests/smoke_install.sh .
+
+  # --------------------------------------------------------------------------
   # AddressSanitizer + UndefinedBehaviorSanitizer on the full test suite.
   # --------------------------------------------------------------------------
   sanitizers:

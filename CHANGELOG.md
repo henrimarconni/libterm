@@ -28,7 +28,7 @@ may contain breaking API changes; patch versions never do).
 
 ## [0.1.0] - 2026-06-03
 
-Retroactive baseline (never tagged). Initial public surface:
+Retroactive baseline — no git tag exists for 0.1.0; v0.2.0 will be the first tag. Initial public surface:
 
 - termbox2-compatible API (`lt_`/`LT_` prefix) on POSIX and native Win32
   Console; three documented intentional divergences.
