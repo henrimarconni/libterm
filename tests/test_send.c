@@ -6,7 +6,11 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#if defined(__APPLE__)
+#include <util.h> /* openpty lives here on macOS (no <pty.h>, no libutil) */
+#else
 #include <pty.h>
+#endif
 #include <string.h>
 #include <unistd.h>
 
