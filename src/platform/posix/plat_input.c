@@ -5,8 +5,10 @@
 #include "posix_resize.h"
 #include <errno.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 /* Inter-byte grace period while assembling a multi-byte input sequence (escape
@@ -792,4 +794,123 @@ int lt__plat_set_mouse(int enable) {
   }
   static const char off[] = "\x1b[?1006l\x1b[?1000l";
   return lt__plat_write(off, sizeof(off) - 1);
+}
+
+/* Milliseconds for the query deadline. (gettimeofday lives in the base libc
+ * namespace under -std=c11; CLOCK_MONOTONIC's clock_gettime would need a
+ * feature-test macro the white-box test TU can't satisfy.) */
+static long long lt__posix_now_ms(void) {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
+  int ttyfd = lt__posix_get_tty_fd();
+  if (ttyfd < 0)
+    return LT_ERR_POLL;
+
+  /* Emit the query: OSC 10/11 for the defaults, OSC 4;<idx> for the palette.
+   * BEL-terminated; replies may use BEL or ST and we accept both. */
+  char q[24];
+  int qlen;
+  if (what == LT_COLOR_DEFAULT_FG)
+    qlen = snprintf(q, sizeof(q), "\x1b]10;?\x07");
+  else if (what == LT_COLOR_DEFAULT_BG)
+    qlen = snprintf(q, sizeof(q), "\x1b]11;?\x07");
+  else
+    qlen = snprintf(q, sizeof(q), "\x1b]4;%d;?\x07", what);
+
+  int rc = lt__plat_write(q, (size_t)qlen);
+  if (rc != LT_OK)
+    return rc;
+  rc = lt__plat_flush();
+  if (rc != LT_OK)
+    return rc;
+
+  long long deadline = lt__posix_now_ms() + timeout_ms;
+
+  /* Scan the input stream for the reply. Bytes that aren't the reply (the
+   * user typing during the window) go to the pushback ring, replayed by the
+   * normal event loop afterwards. A reply to a different OSC number, or a
+   * malformed one, is discarded and the wait continues. */
+  enum { SCAN, ESC_SEEN, COLLECT, COLLECT_ESC } st = SCAN;
+  char reply[64];
+  size_t rlen = 0;
+  bool overflow = false;
+
+  for (;;) {
+    long long remaining = deadline - lt__posix_now_ms();
+    if (remaining <= 0)
+      return LT_ERR_NO_EVENT;
+
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(ttyfd, &rfds);
+    struct timeval tv = {.tv_sec = (time_t)(remaining / 1000),
+                         .tv_usec = (suseconds_t)((remaining % 1000) * 1000)};
+    int src = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
+    if (src < 0) {
+      if (errno == EINTR)
+        continue;
+      lt__g.last_errno = errno;
+      return LT_ERR_POLL;
+    }
+    if (src == 0)
+      return LT_ERR_NO_EVENT;
+
+    unsigned char b;
+    ssize_t n = read(ttyfd, &b, 1);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      lt__g.last_errno = errno;
+      return LT_ERR_READ;
+    }
+    if (n == 0)
+      return LT_ERR_NO_EVENT; /* EOF: no reply is coming */
+
+    switch (st) {
+    case SCAN:
+      if (b == 0x1b)
+        st = ESC_SEEN;
+      else
+        lt__posix_pushback_push(b);
+      break;
+    case ESC_SEEN:
+      if (b == ']') {
+        st = COLLECT;
+        rlen = 0;
+        overflow = false;
+      } else {
+        /* Not a reply: both bytes belong to the user's input. */
+        lt__posix_pushback_push(0x1b);
+        lt__posix_pushback_push(b);
+        st = SCAN;
+      }
+      break;
+    case COLLECT:
+      if (b == 0x07) { /* BEL-terminated reply */
+        if (!overflow &&
+            lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
+          return LT_OK;
+        st = SCAN; /* wrong number / malformed: keep waiting */
+      } else if (b == 0x1b) {
+        st = COLLECT_ESC;
+      } else if (rlen < sizeof(reply)) {
+        reply[rlen++] = (char)b;
+      } else {
+        overflow = true; /* overlong: drain to the terminator, then drop */
+      }
+      break;
+    case COLLECT_ESC:
+      if (b == '\\') { /* ST-terminated reply */
+        if (!overflow &&
+            lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
+          return LT_OK;
+      }
+      st = SCAN; /* terminated, or a malformed ESC inside the payload */
+      break;
+    }
+  }
 }

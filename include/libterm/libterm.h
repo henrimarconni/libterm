@@ -421,6 +421,35 @@ LT_API int lt_set_output_mode(int mode);
  * Stateless — safe to call before lt_init to decide the initial mode. */
 LT_API int lt_detect_color_depth(void);
 
+/* ---- color querying ---- */
+/* Selectors for lt_query_color, alongside plain palette indexes 0..255. */
+#define LT_COLOR_DEFAULT_FG (-1)
+#define LT_COLOR_DEFAULT_BG (-2)
+
+/* Query the terminal's actual color for `what` (LT_COLOR_DEFAULT_FG,
+ * LT_COLOR_DEFAULT_BG, or a palette index 0..255). On success writes a packed
+ * 0x00RRGGBB (8 bits per channel — the truecolor lt_attr packing) to *rgb and
+ * returns LT_OK.
+ * POSIX: a real round-trip — emits OSC 10;? / 11;? / 4;<idx>;? and reads the
+ * terminal's reply off the tty, waiting at most timeout_ms (negative selects
+ * a 1000 ms default). Key bytes arriving during the wait are preserved and
+ * delivered by the next lt_poll_event / lt_peek_event. Returns
+ * LT_ERR_NO_EVENT if no usable reply arrives in time (older terminals; some
+ * multiplexers — note tmux answers OSC 10/11 with its own colors).
+ * Windows: answered immediately from the console color table
+ * (GetConsoleScreenBufferInfoEx; no escape round-trip, timeout_ms ignored);
+ * palette indexes above 15 return LT_ERR_UNSUPPORTED_TERM (the Win32 console
+ * table has 16 entries).
+ * Returns LT_ERR_NOT_INIT before lt_init, LT_ERR_OUT_OF_BOUNDS for a `what`
+ * outside -2..255, LT_ERR for a NULL rgb. */
+LT_API int lt_query_color(int what, uint32_t *rgb, int timeout_ms);
+
+/* Query the default background and report whether it is dark: 1 (dark), 0
+ * (light), or a negative LT_ERR_* passed through from lt_query_color — treat
+ * errors as "unknown" and fall back to a default theme. Thresholds the
+ * ITU-R BT.709 relative luminance at 50%. */
+LT_API int lt_is_dark_background(int timeout_ms);
+
 /* ---- UTF-8 helpers ---- */
 /* Number of bytes in the UTF-8 sequence that lead byte `c` begins: 1-4, or 0 if
  * `c` is not a valid lead byte (a continuation byte, or 0xF8-0xFF). Inspects

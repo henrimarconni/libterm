@@ -97,3 +97,28 @@ int lt__color_parse_osc_reply(const char *payload, size_t len, int what,
   *rgb = ((uint32_t)ch[0] << 16) | ((uint32_t)ch[1] << 8) | (uint32_t)ch[2];
   return LT_OK;
 }
+
+int lt_query_color(int what, uint32_t *rgb, int timeout_ms) {
+  if (!lt__g.initialized)
+    return LT_ERR_NOT_INIT;
+  if (!rgb)
+    return LT_ERR;
+  if (what < LT_COLOR_DEFAULT_BG || what > 255)
+    return LT_ERR_OUT_OF_BOUNDS;
+  if (timeout_ms < 0)
+    timeout_ms = 1000;
+  return lt__plat_query_color(what, rgb, timeout_ms);
+}
+
+int lt_is_dark_background(int timeout_ms) {
+  uint32_t rgb = 0;
+  int rc = lt_query_color(LT_COLOR_DEFAULT_BG, &rgb, timeout_ms);
+  if (rc != LT_OK)
+    return rc;
+  unsigned r = (rgb >> 16) & 0xFFu;
+  unsigned g = (rgb >> 8) & 0xFFu;
+  unsigned b = rgb & 0xFFu;
+  /* ITU-R BT.709 relative luminance, integer arithmetic, 0..255 scale. */
+  unsigned lum = (2126u * r + 7152u * g + 722u * b) / 10000u;
+  return lum < 128u ? 1 : 0;
+}

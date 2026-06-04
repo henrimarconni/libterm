@@ -111,6 +111,11 @@ if(NOT WIN32)
     target_include_directories(test_kitty_negotiation PRIVATE ${CMAKE_SOURCE_DIR}/src)
     add_test(NAME test_kitty_negotiation COMMAND test_kitty_negotiation)
     set_tests_properties(test_kitty_negotiation PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_color_query test_color_query.c)
+    target_link_libraries(test_color_query PRIVATE ${LIBTERM_LINK_TARGET} util)
+    target_include_directories(test_color_query PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME test_color_query COMMAND test_color_query)
+    set_tests_properties(test_color_query PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Assert the selected SIMD backend actually emitted its ISA instructions, so a
