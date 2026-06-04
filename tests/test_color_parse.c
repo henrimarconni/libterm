@@ -48,8 +48,8 @@ int main(void) {
   assert(parse_ok("4;42;rgba:00ff/8080/ffff/dddd", 42) == 0x0180FF);
 
   /* Selector mismatches. */
-  parse_err("10;rgb:0000/0000/0000", -2); /* fg reply, bg expected */
-  parse_err("11;rgb:0000/0000/0000", -1); /* bg reply, fg expected */
+  parse_err("10;rgb:0000/0000/0000", -2);   /* fg reply, bg expected */
+  parse_err("11;rgb:0000/0000/0000", -1);   /* bg reply, fg expected */
   parse_err("4;41;rgb:0000/0000/0000", 42); /* wrong palette index */
   parse_err("4;42;rgb:0000/0000/0000", -2); /* palette reply, bg expected */
 
@@ -60,12 +60,12 @@ int main(void) {
   parse_err("11;rgba:0000/0000/0000", -2);     /* rgba: needs four channels */
   parse_err("11;rgba:0000/0000/0000/0000/0000", -2); /* five channels */
   parse_err("11;rgb:0000/0000/0000/ffff", -2);       /* alpha on rgb: */
-  parse_err("11;rgb:00000/0000/0000", -2);     /* 5-digit channel */
-  parse_err("11;rgb:/0000/0000", -2);          /* empty channel */
+  parse_err("11;rgb:00000/0000/0000", -2);           /* 5-digit channel */
+  parse_err("11;rgb:/0000/0000", -2);                /* empty channel */
   parse_err("11;", -2);
   parse_err("11", -2);
   parse_err("", -2);
-  parse_err("4;;rgb:0000/0000/0000", 42); /* empty index */
+  parse_err("4;;rgb:0000/0000/0000", 42);    /* empty index */
   parse_err("4;999;rgb:0000/0000/0000", 42); /* index out of range */
   return 0;
 }

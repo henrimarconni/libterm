@@ -53,8 +53,7 @@ int lt__color_parse_osc_reply(const char *payload, size_t len, int what,
    * values are LT_COLOR_DEFAULT_FG / LT_COLOR_DEFAULT_BG (libterm.h). */
   if (what == -1 || what == -2) {
     char want = (what == -1) ? '0' : '1';
-    if (len < 3 || payload[0] != '1' || payload[1] != want ||
-        payload[2] != ';')
+    if (len < 3 || payload[0] != '1' || payload[1] != want || payload[2] != ';')
       return LT_ERR;
     i = 3;
   } else {
