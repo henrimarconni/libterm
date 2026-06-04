@@ -147,10 +147,20 @@ endif()
 # so the assertion is neither runnable nor meaningful there. CI runs it on Linux.
 # Linux-only: the script assumes ELF objects and GNU objdump output; Mach-O would false-fail.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND DEFINED LIBTERM_SIMD_RESOLVED)
-    add_test(
-        NAME test_simd_emitted
-        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
-                ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
+    if(LIBTERM_SIMD_BACKENDS)
+        # Dispatch build: every compiled backend object must emit its ISA.
+        foreach(backend IN LISTS LIBTERM_SIMD_BACKENDS)
+            add_test(
+                NAME test_simd_emitted_${backend}
+                COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
+                        ${backend} ${CMAKE_BINARY_DIR})
+        endforeach()
+    else()
+        add_test(
+            NAME test_simd_emitted
+            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
+                    ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
+    endif()
 endif()
 
 # Assert the shared library actually exports its public API (guards B2: the
