@@ -1,4 +1,18 @@
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/LibtermTargets.cmake")
+
+# Umbrella matching the in-tree alias Libterm::libterm: prefer static, else
+# shared (same order as src/CMakeLists.txt's default alias).
+if(NOT TARGET Libterm::libterm)
+    add_library(Libterm::libterm INTERFACE IMPORTED)
+    if(TARGET Libterm::static)
+        set_target_properties(Libterm::libterm PROPERTIES
+            INTERFACE_LINK_LIBRARIES Libterm::static)
+    elseif(TARGET Libterm::shared)
+        set_target_properties(Libterm::libterm PROPERTIES
+            INTERFACE_LINK_LIBRARIES Libterm::shared)
+    endif()
+endif()
+
 check_required_components(Libterm)
