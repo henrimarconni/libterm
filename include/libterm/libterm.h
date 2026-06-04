@@ -28,7 +28,7 @@ extern "C" {
 
 /* ---- version ---- */
 #define LT_VERSION_MAJOR 0
-#define LT_VERSION_MINOR 2
+#define LT_VERSION_MINOR 1
 #define LT_VERSION_PATCH 0
 
 /* ---- return codes ---- */
