@@ -77,22 +77,31 @@ int lt__color_parse_osc_reply(const char *payload, size_t len, int what,
     i++;
   }
 
-  if (len < i + 4 || memcmp(payload + i, "rgb:", 4) != 0)
+  if (len < i + 4 || memcmp(payload + i, "rgb", 3) != 0)
     return LT_ERR;
-  i += 4;
+  i += 3;
+  /* URxvt extension: "rgba:" with a fourth (alpha) channel, ignored. */
+  int nch = 3;
+  if (payload[i] == 'a') {
+    nch = 4;
+    i++;
+  }
+  if (i >= len || payload[i] != ':')
+    return LT_ERR;
+  i++;
 
-  unsigned ch[3];
-  for (int c = 0; c < 3; c++) {
+  unsigned ch[4];
+  for (int c = 0; c < nch; c++) {
     if (lt__parse_channel(payload, len, &i, &ch[c]) != LT_OK)
       return LT_ERR;
-    if (c < 2) {
+    if (c < nch - 1) {
       if (i >= len || payload[i] != '/')
         return LT_ERR;
       i++;
     }
   }
   if (i != len)
-    return LT_ERR; /* trailing junk (e.g. a fourth channel) */
+    return LT_ERR; /* trailing junk */
 
   *rgb = ((uint32_t)ch[0] << 16) | ((uint32_t)ch[1] << 8) | (uint32_t)ch[2];
   return LT_OK;

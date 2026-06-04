@@ -42,6 +42,11 @@ int main(void) {
   assert(parse_ok("4;0;rgb:0000/0000/0000", 0) == 0x000000);
   assert(parse_ok("4;255;rgb:ffff/ffff/ffff", 255) == 0xFFFFFF);
 
+  /* URxvt rgba: extension — R/G/B/A, alpha last, ignored. */
+  assert(parse_ok("11;rgba:1c1c/1c1c/1c1c/ffff", -2) == 0x1C1C1C);
+  assert(parse_ok("11;rgba:ffff/0000/0000/0000", -2) == 0xFF0000);
+  assert(parse_ok("4;42;rgba:00ff/8080/ffff/dddd", 42) == 0x0180FF);
+
   /* Selector mismatches. */
   parse_err("10;rgb:0000/0000/0000", -2); /* fg reply, bg expected */
   parse_err("11;rgb:0000/0000/0000", -1); /* bg reply, fg expected */
@@ -52,7 +57,9 @@ int main(void) {
   parse_err("11;rgb:zzzz/0000/0000", -2);      /* non-hex */
   parse_err("11;rgb:0000/0000", -2);           /* two channels */
   parse_err("11;rgb:0000/0000/0000/0000", -2); /* four channels */
-  parse_err("11;rgba:0000/0000/0000", -2);     /* rgba: out of scope */
+  parse_err("11;rgba:0000/0000/0000", -2);     /* rgba: needs four channels */
+  parse_err("11;rgba:0000/0000/0000/0000/0000", -2); /* five channels */
+  parse_err("11;rgb:0000/0000/0000/ffff", -2);       /* alpha on rgb: */
   parse_err("11;rgb:00000/0000/0000", -2);     /* 5-digit channel */
   parse_err("11;rgb:/0000/0000", -2);          /* empty channel */
   parse_err("11;", -2);

@@ -140,9 +140,10 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
 
 /* ---- color-query reply parsing (shared/colorq.c) ----
  * Parse an OSC color-reply payload — the bytes between "ESC ]" and the BEL/ST
- * terminator: "10;rgb:...", "11;rgb:...", or "4;<idx>;rgb:...". Channels are
- * 1-4 hex digits per the X11 XParseColor forms, scaled to 8 bits with
- * rounding. Returns LT_OK and fills *rgb (0x00RRGGBB) only if the reply
+ * terminator: "10;rgb:...", "11;rgb:...", or "4;<idx>;rgb:...". The URxvt
+ * "rgba:" form (R/G/B/A, alpha last) is also accepted, with alpha ignored.
+ * Channels are 1-4 hex digits per the X11 XParseColor forms, scaled to 8 bits
+ * with rounding. Returns LT_OK and fills *rgb (0x00RRGGBB) only if the reply
  * matches `what` (LT_COLOR_DEFAULT_FG / LT_COLOR_DEFAULT_BG / palette index
  * 0..255) and parses cleanly; LT_ERR otherwise. */
 int lt__color_parse_osc_reply(const char *payload, size_t len, int what,
