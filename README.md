@@ -83,4 +83,4 @@ Full API reference and guides live in the [project wiki](https://github.com/rizu
 
 ## License
 
-MIT — derived from termbox2 (also MIT). See the source header notices.
+MIT
