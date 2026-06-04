@@ -638,6 +638,16 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
             return LT_OK;
           }
 
+          if (m == LT__KEY_DISCARD) {
+            /* Recognized bytes (a stray OSC reply) that yield no event. */
+            if (consumed < len) {
+              memmove(seq, seq + consumed, len - consumed);
+              len -= consumed;
+              continue; /* re-decode the remainder */
+            }
+            goto outer_continue; /* nothing left: wait for fresh input */
+          }
+
           if (m == LT__KEY_PARTIAL && len < sizeof(seq)) {
             unsigned char nb;
             if (lt__posix_read_one_grace(&nb)) {
@@ -715,6 +725,7 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
     lt__g.last_errno = errno;
     return LT_ERR_READ;
+  outer_continue:;
   }
   return LT_OK;
 }

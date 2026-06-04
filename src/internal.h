@@ -129,7 +129,9 @@ int lt__render_run(const struct lt_cell *cells, int count);
 enum lt__key_match {
   LT__KEY_NOMATCH = 0, /* not a recognized sequence */
   LT__KEY_PARTIAL = 1, /* valid prefix of a known sequence; read more */
-  LT__KEY_MATCH = 2    /* out filled; *consumed = bytes used */
+  LT__KEY_MATCH = 2,   /* out filled; *consumed = bytes used */
+  LT__KEY_DISCARD = 3  /* *consumed bytes recognized but yield no event
+                          (e.g. a stray OSC color-query reply) */
 };
 
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,

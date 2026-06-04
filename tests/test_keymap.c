@@ -210,5 +210,31 @@ int main(void) {
   assert(decode_ok("\x1b[A", 3, LT_INPUT_COMPAT).key == LT_KEY_ARROW_UP);
   assert(decode_ok("\x1b[3~", 4, LT_INPUT_COMPAT).key == LT_KEY_DELETE);
 
+  /* OSC consume: a stray color-query reply (one that arrived after
+   * lt_query_color's deadline) is recognized and discarded — never shredded
+   * into key events. */
+  {
+    struct lt_event ev;
+    size_t used = 0;
+    static const unsigned char osc_bel[] = "\x1b]11;rgb:1c1c/1c1c/1c1c\x07";
+    size_t n = sizeof(osc_bel) - 1;
+    assert(lt__key_decode(osc_bel, n, 0, &ev, &used) == LT__KEY_DISCARD);
+    assert(used == n);
+
+    static const unsigned char osc_st[] = "\x1b]10;rgb:0000/0000/0000\x1b\\";
+    n = sizeof(osc_st) - 1;
+    assert(lt__key_decode(osc_st, n, 0, &ev, &used) == LT__KEY_DISCARD);
+    assert(used == n);
+
+    /* Incomplete OSC: keep reading. */
+    assert(lt__key_decode(osc_bel, 5, 0, &ev, &used) == LT__KEY_PARTIAL);
+    assert(lt__key_decode((const unsigned char *)"\x1b]", 2, 0, &ev, &used) ==
+           LT__KEY_PARTIAL);
+    /* OSC whose payload hits a bare ESC not followed by '\\': malformed. */
+    static const unsigned char osc_bad[] = "\x1b]11;x\x1b@";
+    assert(lt__key_decode(osc_bad, sizeof(osc_bad) - 1, 0, &ev, &used) ==
+           LT__KEY_NOMATCH);
+  }
+
   return 0;
 }
