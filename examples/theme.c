@@ -94,14 +94,30 @@ int main(void) {
   lt_printf(2, 1, t->header_fg, t->header_bg, "  libterm theme demo — %s  ",
             verdict);
 
-  if (fg_ok)
-    lt_printf(2, 3, t->body_fg, t->body_bg, "queried default fg: #%06X", fg);
-  else
+  /* The hex value is printed in the very color it names (with a filled
+   * swatch beside it, in case the text lands on a matching background).
+   * Queried colors are 0x00RRGGBB — exactly the truecolor lt_attr packing;
+   * real black needs the LT_HI_BLACK sentinel (a bare 0 means "terminal
+   * default"). Only meaningful in truecolor mode; lower depths would
+   * reinterpret the bits as palette indexes, so they print plainly. */
+  if (fg_ok) {
+    lt_print(2, 3, t->body_fg, t->body_bg, "queried default fg:");
+    lt_attr c = fg ? (lt_attr)fg : LT_HI_BLACK;
+    lt_printf(22, 3, truecolor ? c : t->body_fg, t->body_bg, "#%06X", fg);
+    if (truecolor)
+      lt_print(30, 3, t->body_fg, c, "    ");
+  } else {
     lt_print(2, 3, t->body_fg, t->body_bg, "queried default fg: n/a");
-  if (bg_ok)
-    lt_printf(2, 4, t->body_fg, t->body_bg, "queried default bg: #%06X", bg);
-  else
+  }
+  if (bg_ok) {
+    lt_print(2, 4, t->body_fg, t->body_bg, "queried default bg:");
+    lt_attr c = bg ? (lt_attr)bg : LT_HI_BLACK;
+    lt_printf(22, 4, truecolor ? c : t->body_fg, t->body_bg, "#%06X", bg);
+    if (truecolor)
+      lt_print(30, 4, t->body_fg, c, "    ");
+  } else {
     lt_print(2, 4, t->body_fg, t->body_bg, "queried default bg: n/a");
+  }
 
   lt_print(2, 6, t->accent_fg, t->accent_bg,
            "────────────────────────────────────────");
