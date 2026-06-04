@@ -48,9 +48,9 @@ jobs:
   # warnings-as-errors (WAE) is enabled only where the tree is actually -Werror
   # clean. clang's -Wcast-align flags the unaligned-load SIMD intrinsic casts
   # (_mm256_loadu_si256 etc.) that gcc accepts, so clang+SIMD and the apple-clang
-  # neon build run with WAE OFF. The macOS job builds the library only: the test
-  # suite #includes <pty.h>, which is Linux-only (macOS exposes openpty via
-  # <util.h>), so ctest there needs a test-portability fix first.
+  # neon build run with WAE OFF. The macOS job runs the full portable suite; the
+  # two ELF/GNU-host-tool assertion tests (simd_emitted, exports) are Linux-gated
+  # in tests/CMakeLists.txt.
   # --------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.name }}
@@ -65,8 +65,8 @@ jobs:
           - { name: linux-gcc-avx512,   os: ubuntu-latest, cc: gcc,   simd: avx512, wae: 'ON',  run_tests: false, extra: '' }
           - { name: linux-clang-scalar, os: ubuntu-latest, cc: clang, simd: scalar, wae: 'ON',  run_tests: true,  extra: '' }
           - { name: linux-clang-avx2,   os: ubuntu-latest, cc: clang, simd: avx2,   wae: 'OFF', run_tests: true,  extra: '' }
-          # macOS arm64 / neon — builds the library (tests not yet macOS-portable).
-          - { name: macos-clang-neon,   os: macos-latest,  cc: clang, simd: auto,   wae: 'OFF', run_tests: false, extra: '-DLIBTERM_BUILD_TESTS=OFF -DLIBTERM_BUILD_EXAMPLES=OFF -DLIBTERM_BUILD_BENCH=OFF' }
+          # macOS arm64 / neon — runs the portable suite (examples/bench stay off).
+          - { name: macos-clang-neon,   os: macos-latest,  cc: clang, simd: auto,   wae: 'OFF', run_tests: true,  extra: '-DLIBTERM_BUILD_EXAMPLES=OFF -DLIBTERM_BUILD_BENCH=OFF' }
     env:
       CC: ${{ matrix.cc }}
     steps:
