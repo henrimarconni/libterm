@@ -19,7 +19,7 @@ may contain breaking API changes; patch versions never do).
 - Install/export packaging: `install(TARGETS)` + `LibtermTargets.cmake`, so
   `find_package(Libterm)` yields working `Libterm::libterm` / `Libterm::static`
   / `Libterm::shared` targets; smoke-tested by `tests/smoke_install.sh`.
-- macOS: test suite is now portable (`<util.h>`/no-libutil) and runs in CI.
+- macOS: portable test subset + the pty lifecycle canary run in CI (`<util.h>`/no-libutil shims; full pty-test parity tracked in ROADMAP Known blockers).
 
 ### Changed
 - Key decoder consumes and discards stray OSC replies instead of emitting

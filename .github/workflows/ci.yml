@@ -48,9 +48,9 @@ jobs:
   # warnings-as-errors (WAE) is enabled only where the tree is actually -Werror
   # clean. clang's -Wcast-align flags the unaligned-load SIMD intrinsic casts
   # (_mm256_loadu_si256 etc.) that gcc accepts, so clang+SIMD and the apple-clang
-  # neon build run with WAE OFF. The macOS job runs the full portable suite; the
-  # two ELF/GNU-host-tool assertion tests (simd_emitted, exports) are Linux-gated
-  # in tests/CMakeLists.txt.
+  # neon build run with WAE OFF. The macOS job runs the portable suite plus the
+  # pty canary (test_pty_lifecycle); the remaining pty tests are Apple-gated
+  # pending the macOS pty-test parity item in ROADMAP "Known blockers".
   # --------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.name }}
