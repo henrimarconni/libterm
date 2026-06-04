@@ -106,22 +106,25 @@ All renamed wholesale: every `TB_*` token becomes `LT_*`. The header `include/li
 | `TB_ERR_INIT_OPEN` | `LT_ERR_INIT_OPEN` | [x] | [x] |
 | `TB_ERR_MEM` | `LT_ERR_MEM` | [x] | [x] |
 | `TB_ERR_NO_EVENT` | `LT_ERR_NO_EVENT` | [x] | [x] |
-| `TB_ERR_NO_TERM` | `LT_ERR_NO_TERM` | [x] | [ ] |
+| `TB_ERR_NO_TERM` | `LT_ERR_NO_TERM` | [x] | [—] |
 | `TB_ERR_NOT_INIT` | `LT_ERR_NOT_INIT` | [x] | [x] |
 | `TB_ERR_OUT_OF_BOUNDS` | `LT_ERR_OUT_OF_BOUNDS` | [x] | [x] |
 | `TB_ERR_READ` | `LT_ERR_READ` | [x] | [x] |
-| `TB_ERR_RESIZE_IOCTL` | `LT_ERR_RESIZE_IOCTL` | [x] | [ ] |
-| `TB_ERR_RESIZE_PIPE` | `LT_ERR_RESIZE_PIPE` | [x] | [ ] |
-| `TB_ERR_RESIZE_SIGACTION` | `LT_ERR_RESIZE_SIGACTION` | [x] | [ ] |
+| `TB_ERR_RESIZE_IOCTL` | `LT_ERR_RESIZE_IOCTL` | [x] | [—] |
+| `TB_ERR_RESIZE_PIPE` | `LT_ERR_RESIZE_PIPE` | [x] | [—] |
+| `TB_ERR_RESIZE_SIGACTION` | `LT_ERR_RESIZE_SIGACTION` | [x] | [—] |
 | `TB_ERR_POLL` | `LT_ERR_POLL` | [x] | [x] |
-| `TB_ERR_TCGETATTR` | `LT_ERR_TCGETATTR` | [x] | [ ] |
-| `TB_ERR_TCSETATTR` | `LT_ERR_TCSETATTR` | [x] | [ ] |
-| `TB_ERR_UNSUPPORTED_TERM` | `LT_ERR_UNSUPPORTED_TERM` | [x] | [ ] |
-| `TB_ERR_RESIZE_WRITE` | `LT_ERR_RESIZE_WRITE` | [x] | [ ] |
-| `TB_ERR_RESIZE_POLL` | `LT_ERR_RESIZE_POLL` | [x] | [ ] |
-| `TB_ERR_RESIZE_READ` | `LT_ERR_RESIZE_READ` | [x] | [ ] |
-| `TB_ERR_RESIZE_SSCANF` | `LT_ERR_RESIZE_SSCANF` | [x] | [ ] |
-| `TB_ERR_CAP_COLLISION` | `LT_ERR_CAP_COLLISION` | [x] | [ ] |
+| `TB_ERR_TCGETATTR` | `LT_ERR_TCGETATTR` | [x] | [—] |
+| `TB_ERR_TCSETATTR` | `LT_ERR_TCSETATTR` | [x] | [—] |
+| `TB_ERR_UNSUPPORTED_TERM` | `LT_ERR_UNSUPPORTED_TERM` | [x] | [x] |
+| `TB_ERR_RESIZE_WRITE` | `LT_ERR_RESIZE_WRITE` | [x] | [—] |
+| `TB_ERR_RESIZE_POLL` | `LT_ERR_RESIZE_POLL` | [x] | [—] |
+| `TB_ERR_RESIZE_READ` | `LT_ERR_RESIZE_READ` | [x] | [—] |
+| `TB_ERR_RESIZE_SSCANF` | `LT_ERR_RESIZE_SSCANF` | [x] | [—] |
+| `TB_ERR_CAP_COLLISION` | `LT_ERR_CAP_COLLISION` | [x] | [—] |
+
+The [—] rows name POSIX-only syscall/terminfo failures; the producing call sites do not exist on Windows.
+LT_ERR_UNSUPPORTED_TERM is produced on Windows by lt_get_fds and lt_query_color (palette index > 15).
 
 ### Event types (`TB_EVENT_*` → `LT_EVENT_*`)
 

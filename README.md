@@ -81,6 +81,13 @@ Built into `build/examples/`:
 
 Full API reference and guides live in the [project wiki](https://github.com/rizukirr/libterm/wiki).
 
+## Stability
+
+Pre-1.0: minor versions (0.x) may contain breaking API changes, always listed
+in [CHANGELOG.md](CHANGELOG.md). Patch versions never break API or ABI
+(SOVERSION 0 until 1.0). The termbox2-compatible surface is the stability
+contract — see the [Roadmap](ROADMAP.md) for per-symbol status.
+
 ## License
 
 MIT
