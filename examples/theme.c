@@ -24,27 +24,39 @@ struct theme {
 };
 
 static const struct theme dark_theme_rgb = {
-    .header_fg = LT_RGB(0xEC, 0xEF, 0xF4), .header_bg = LT_RGB(0x3B, 0x42, 0x52),
-    .body_fg = LT_RGB(0xD8, 0xDE, 0xE9),   .body_bg = LT_DEFAULT,
-    .accent_fg = LT_RGB(0x88, 0xC0, 0xD0), .accent_bg = LT_DEFAULT,
+    .header_fg = LT_RGB(0xEC, 0xEF, 0xF4),
+    .header_bg = LT_RGB(0x3B, 0x42, 0x52),
+    .body_fg = LT_RGB(0xD8, 0xDE, 0xE9),
+    .body_bg = LT_DEFAULT,
+    .accent_fg = LT_RGB(0x88, 0xC0, 0xD0),
+    .accent_bg = LT_DEFAULT,
 };
 
 static const struct theme light_theme_rgb = {
-    .header_fg = LT_RGB(0xFA, 0xFA, 0xFA), .header_bg = LT_RGB(0x44, 0x71, 0x7C),
-    .body_fg = LT_RGB(0x37, 0x47, 0x4F),   .body_bg = LT_DEFAULT,
-    .accent_fg = LT_RGB(0x00, 0x60, 0x6B), .accent_bg = LT_DEFAULT,
+    .header_fg = LT_RGB(0xFA, 0xFA, 0xFA),
+    .header_bg = LT_RGB(0x44, 0x71, 0x7C),
+    .body_fg = LT_RGB(0x37, 0x47, 0x4F),
+    .body_bg = LT_DEFAULT,
+    .accent_fg = LT_RGB(0x00, 0x60, 0x6B),
+    .accent_bg = LT_DEFAULT,
 };
 
 static const struct theme dark_theme_named = {
-    .header_fg = LT_BLACK, .header_bg = LT_WHITE,
-    .body_fg = LT_WHITE,   .body_bg = LT_DEFAULT,
-    .accent_fg = LT_CYAN,  .accent_bg = LT_DEFAULT,
+    .header_fg = LT_BLACK,
+    .header_bg = LT_WHITE,
+    .body_fg = LT_WHITE,
+    .body_bg = LT_DEFAULT,
+    .accent_fg = LT_CYAN,
+    .accent_bg = LT_DEFAULT,
 };
 
 static const struct theme light_theme_named = {
-    .header_fg = LT_WHITE, .header_bg = LT_BLUE,
-    .body_fg = LT_BLACK,   .body_bg = LT_DEFAULT,
-    .accent_fg = LT_BLUE,  .accent_bg = LT_DEFAULT,
+    .header_fg = LT_WHITE,
+    .header_bg = LT_BLUE,
+    .body_fg = LT_BLACK,
+    .body_bg = LT_DEFAULT,
+    .accent_fg = LT_BLUE,
+    .accent_bg = LT_DEFAULT,
 };
 
 int main(void) {
@@ -58,7 +70,8 @@ int main(void) {
   lt_set_output_mode(depth);
   lt_hide_cursor();
 
-  /* ---- query phase: 500 ms timeouts so a silent terminal stalls briefly ---- */
+  /* ---- query phase: 500 ms timeouts so a silent terminal stalls briefly ----
+   */
   uint32_t fg = 0, bg = 0;
   int fg_ok = lt_query_color(LT_COLOR_DEFAULT_FG, &fg, 500) == LT_OK;
   int bg_ok = lt_query_color(LT_COLOR_DEFAULT_BG, &bg, 500) == LT_OK;
@@ -78,17 +91,15 @@ int main(void) {
   const char *verdict = no_reply ? "no reply — defaulting to DARK"
                                  : (dark ? "detected: DARK background"
                                          : "detected: LIGHT background");
-  lt_printf(2, 1, t->header_fg, t->header_bg,
-            "  libterm theme demo — %s  ", verdict);
+  lt_printf(2, 1, t->header_fg, t->header_bg, "  libterm theme demo — %s  ",
+            verdict);
 
   if (fg_ok)
-    lt_printf(2, 3, t->body_fg, t->body_bg,
-              "queried default fg: #%06X", fg);
+    lt_printf(2, 3, t->body_fg, t->body_bg, "queried default fg: #%06X", fg);
   else
     lt_print(2, 3, t->body_fg, t->body_bg, "queried default fg: n/a");
   if (bg_ok)
-    lt_printf(2, 4, t->body_fg, t->body_bg,
-              "queried default bg: #%06X", bg);
+    lt_printf(2, 4, t->body_fg, t->body_bg, "queried default bg: #%06X", bg);
   else
     lt_print(2, 4, t->body_fg, t->body_bg, "queried default bg: n/a");
 
