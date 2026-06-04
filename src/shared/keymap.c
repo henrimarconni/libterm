@@ -451,6 +451,29 @@ enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
   if (len == 1 && seq[0] == 0x1b)
     return LT__KEY_PARTIAL;
 
+  /* OSC (ESC ] ... BEL | ESC \): terminal replies, not key input. The only
+   * OSC bytes that reach the decoder are color-query replies
+   * (lt_query_color) that landed after the query's deadline — consume them
+   * silently instead of shredding them into key events. */
+  if (seq[0] == 0x1b && len >= 2 && seq[1] == ']') {
+    for (size_t i = 2; i < len; i++) {
+      if (seq[i] == 0x07) {
+        *consumed = i + 1;
+        return LT__KEY_DISCARD;
+      }
+      if (seq[i] == 0x1b) {
+        if (i + 1 >= len)
+          return LT__KEY_PARTIAL; /* ESC may begin the ST terminator */
+        if (seq[i + 1] == '\\') {
+          *consumed = i + 2;
+          return LT__KEY_DISCARD;
+        }
+        return LT__KEY_NOMATCH; /* bare ESC inside payload: malformed */
+      }
+    }
+    return LT__KEY_PARTIAL; /* no terminator yet; read more */
+  }
+
   /* SGR mouse starts ESC [ < ; check before the fixed/param tables. */
   if (seq[0] == 0x1b && len >= 3 && seq[1] == '[' && seq[2] == '<')
     return lt__match_mouse(seq, len, out, consumed);

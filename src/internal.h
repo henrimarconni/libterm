@@ -129,11 +129,24 @@ int lt__render_run(const struct lt_cell *cells, int count);
 enum lt__key_match {
   LT__KEY_NOMATCH = 0, /* not a recognized sequence */
   LT__KEY_PARTIAL = 1, /* valid prefix of a known sequence; read more */
-  LT__KEY_MATCH = 2    /* out filled; *consumed = bytes used */
+  LT__KEY_MATCH = 2,   /* out filled; *consumed = bytes used */
+  LT__KEY_DISCARD = 3  /* *consumed bytes recognized but yield no event
+                          (e.g. a stray OSC color-query reply) */
 };
 
 enum lt__key_match lt__key_decode(const unsigned char *seq, size_t len,
                                   int input_mode, struct lt_event *out,
                                   size_t *consumed);
+
+/* ---- color-query reply parsing (shared/colorq.c) ----
+ * Parse an OSC color-reply payload — the bytes between "ESC ]" and the BEL/ST
+ * terminator: "10;rgb:...", "11;rgb:...", or "4;<idx>;rgb:...". The URxvt
+ * "rgba:" form (R/G/B/A, alpha last) is also accepted, with alpha ignored.
+ * Channels are 1-4 hex digits per the X11 XParseColor forms, scaled to 8 bits
+ * with rounding. Returns LT_OK and fills *rgb (0x00RRGGBB) only if the reply
+ * matches `what` (LT_COLOR_DEFAULT_FG / LT_COLOR_DEFAULT_BG / palette index
+ * 0..255) and parses cleanly; LT_ERR otherwise. */
+int lt__color_parse_osc_reply(const char *payload, size_t len, int what,
+                              uint32_t *rgb);
 
 #endif /* LIBTERM_INTERNAL_H */

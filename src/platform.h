@@ -87,4 +87,15 @@ int lt__plat_set_mouse(int enable);
  * Returns LT_ERR_UNSUPPORTED_TERM on platforms that have none (Windows). */
 int lt__plat_get_fds(int *ttyfd, int *resizefd);
 
+/* ---- color query ---- */
+/* Resolve `what` (LT_COLOR_DEFAULT_FG / LT_COLOR_DEFAULT_BG / palette index
+ * 0..255; already validated by the shared caller) to a packed 0x00RRGGBB in
+ * *rgb. POSIX: emits the OSC query and reads the terminal's reply off the
+ * tty, waiting at most timeout_ms; non-reply bytes are preserved for the
+ * next lt__plat_read_event. Windows: immediate, from the console color
+ * table; timeout_ms is ignored; palette indexes above 15 return
+ * LT_ERR_UNSUPPORTED_TERM. Returns LT_OK, LT_ERR_NO_EVENT if no usable reply
+ * arrived in time, or a write/read error code. */
+int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms);
+
 #endif /* LIBTERM_PLATFORM_H */

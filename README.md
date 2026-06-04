@@ -1,8 +1,12 @@
 # libterm
 
-A small, cross-platform terminal UI library in C11 — a [termbox2](https://github.com/termbox/termbox2)-compatible API on POSIX and native Windows (Win32 Console API).
+**Fast. Native. Fluent in modern terminal protocols.** libterm is a small C11 terminal UI library with a [termbox2](https://github.com/termbox/termbox2)-compatible API — the same code drives POSIX terminals and the native Win32 Console, with no POSIX shims and no `#ifdef` in your app.
 
-You draw into an off-screen cell buffer and call `lt_present()`; libterm diffs it against the previous frame and emits only the bytes that changed, wrapped in a synchronized-update bracket. All identifiers use the `lt_` / `LT_` prefix.
+- **Fast** — draw into an off-screen cell buffer and call `lt_present()`: libterm diffs the frame with SIMD-accelerated scans (AVX2 / AVX-512 / NEON / SVE / RVV) and emits only the bytes that changed, inside a synchronized-update bracket. Flicker-free by construction.
+- **Native** — `/dev/tty` + termios raw mode on POSIX; the real Win32 Console API on Windows. First-class citizens on both, not a port.
+- **Modern protocols** — kitty keyboard protocol, 24-bit truecolor, OSC color querying with light/dark detection: negotiated automatically, degrading gracefully on terminals that lack them.
+
+All identifiers use the `lt_` / `LT_` prefix.
 
 ## Features
 
@@ -11,6 +15,7 @@ You draw into an off-screen cell buffer and call `lt_present()`; libterm diffs i
 - **Double-buffered diff rendering** with a SIMD-accelerated cell scan (AVX2 / AVX-512 / NEON / SVE / RVV, scalar fallback, auto-selected).
 - **Unicode** — UTF-8 decode/encode, `wcwidth` (wide & zero-width handling), and grapheme clusters (combining marks, ZWJ emoji).
 - **Color** — 8-color, 256, 216-cube, grayscale, and 24-bit truecolor output modes, plus 7 attributes (bold, dim, italic, underline, blink, reverse, strike).
+- **Color querying** — `lt_query_color` / `lt_is_dark_background`: POSIX does a real OSC 10/11/4 round-trip (timeout-bounded; input typed during the query is preserved); Windows answers natively from the console color table (`GetConsoleScreenBufferInfoEx`) — immediate and version-independent, but palette indexes above 15 return `LT_ERR_UNSUPPORTED_TERM`. Under tmux, replies describe tmux's own colors (it answers OSC 10/11 itself); a terminal that doesn't answer yields `LT_ERR_NO_EVENT` after the timeout.
 - **Input** — modern by default, with the same `lt_event` surface on both platforms: modifiers on *every* key (including Shift+letter), bare-modifier keys, key press/repeat/release in `ev.action`, plus mouse and resize events. On POSIX the [kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) is negotiated, with automatic fallback to broad legacy decoding (xterm normal/application, SS3, rxvt, Linux console, vt220 tilde forms + CSI modifier suffixes) on terminals that don't support it; on Windows the same events come straight from the Win32 console API (no escape sequences), including best-effort `Ctrl`+letter disambiguation. `LT_INPUT_COMPAT` restores termbox2 control-byte semantics for drop-in code.
 
 ## Build

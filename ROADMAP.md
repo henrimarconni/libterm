@@ -81,6 +81,8 @@ Legend: `[x]` working · `[~]` partial / stubbed · `[ ]` not implemented · `[�
 | `tb_strerror` | `lt_strerror` | [x] | [x] | Implemented in `src/shared/errors.c` for **all 23** return codes (distinct messages + `"unknown error"` fallback); exhaustiveness + distinctness asserted in `tests/test_api.c` |
 | `tb_has_truecolor` | `lt_has_truecolor` | [—] | [—] | **Intentional divergence.** termbox2's is a compile-time flag; libterm supersedes it with the runtime `lt_detect_color_depth` (below), which is strictly more informative (returns the actual color ceiling, not just a truecolor yes/no) |
 | *(libterm addition)* | `lt_detect_color_depth` | [x] | [x] | Stateless runtime query: inspects `$COLORTERM` (`truecolor`/`24bit`) then `$TERM` (`*256color*` substring) and returns the terminal's color ceiling as an `LT_OUTPUT_*` mode (truecolor/256/normal). Pure standard-C `getenv` in `src/shared/output.c` — no platform code, safe to call before `lt_init`. Byte-exact logic asserted by hermetic `setenv`-driven test `tests/test_detect_color_depth.c` (harness POSIX-only; the function itself is platform-agnostic) |
+| *(libterm addition)* | `lt_query_color` | [x] | [x] | The terminal's *actual* color for `LT_COLOR_DEFAULT_FG` / `LT_COLOR_DEFAULT_BG` / palette index 0..255, packed `0x00RRGGBB`. POSIX: real `OSC 10/11/4` round-trip (timeout-bounded, monotonic deadline; `rgb:` + URxvt `rgba:` replies; typed input preserved via the pushback ring; stray/late replies consumed by the decoder). Windows: native `GetConsoleScreenBufferInfoEx` color table — immediate; index > 15 → `LT_ERR_UNSUPPORTED_TERM`. Pty round-trip test `tests/test_color_query.c`, parser unit test `tests/test_color_parse.c`, Windows CSBI mapping test `tests/test_win_color_query.c`. Demoed in `examples/theme.c` |
+| *(libterm addition)* | `lt_is_dark_background` | [x] | [x] | Queries the default background and thresholds its ITU-R BT.709 relative luminance: 1 dark / 0 light / negative `LT_ERR_*` passed through (recommended fallback: treat errors as "assume dark"). Same platform paths and tests as `lt_query_color`; demoed in `examples/theme.c` |
 | `tb_has_egc` | `lt_has_egc` | [x] | [x] | Returns 1 — grapheme-cluster support is always built in (no compile-time opt-out, unlike termbox2's `TB_OPT_EGC`) |
 | `tb_attr_width` | `lt_attr_width` | [x] | [x] | Returns `sizeof(lt_attr)` = 4. libterm has no compile-time attribute-width option (`lt_attr` is always `uint32_t`), so it's constant. Tested in `tests/test_wcwidth.c` |
 | `tb_version` | `lt_version` | [x] | [x] | Returns `"0.1.0"` |
@@ -262,17 +264,24 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 **Payoff.** Moves the POSIX `LT_MOD_ALT/CTRL/SHIFT` rows toward `[x]` for *all* keys (not just CSI families), enables bare-modifier and Shift+letter detection, adds key-release/repeat, and resolves the "inherently lossy" caveat in Known blocker #2. `examples/kbd.c` (the on-screen keyboard + live event inspector) is the natural development harness — once libterm emits the bits, its inspector and modifier caps light up for every combination.
 
-### Kitty color protocol (querying / theming)
+### Color querying + theming (kitty-enhanced)
 
-> **Status: wanted, not yet scoped.** Placeholder for a future progressive enhancement, beyond termbox2.
+> **Status: slice 1 shipped — `lt_query_color` + `lt_is_dark_background`.** POSIX does the OSC 10/11/4 round-trip (timeout-bounded, typed input preserved via a raw-byte pushback ring); Windows answers natively from `GetConsoleScreenBufferInfoEx` (palette indexes above 15 unsupported). Spec: `docs/specs/2026-06-04-color-query-design.md`. Remaining slices: mode 2031 theme-changed events and the kitty OSC 21 color stack.
 
-**Idea.** Let an app learn the terminal's actual colors — query the default foreground/background and the palette (standard `OSC 10` / `11` / `4` with a `?`, plus kitty's extended `OSC 21`), so it can detect a **light vs dark background** and theme itself accordingly. Optionally, *set* terminal colors and push/pop a **color stack** to recolor the terminal and restore it cleanly on exit (the kitty-specific part).
+**Idea.** Let an app learn the terminal's actual colors so it can detect a **light vs dark background** and theme itself accordingly. The valuable core is *not* kitty-specific: querying the default foreground/background and the palette is plain `OSC 10` / `11` / `4` with a `?`, supported broadly (xterm, kitty, foot, alacritty, WezTerm, ghostty, iTerm2). Kitty's extended `OSC 21` layers on top as a progressive enhancement — batch query/set, special colors, and a push/pop **color stack** to recolor the terminal and restore it cleanly on exit. Same shape as the keyboard work: portable base, kitty-enhanced.
+
+**API surface (slice 1 shipped: queries + dark-bg; rest planned).**
+- *Shipped:* query fg / bg / palette index with a timeout (replies are X11-style `rgb:rrrr/gggg/bbbb`, 16-bit per channel, terminated by BEL *or* ST — terminals differ).
+- *Shipped:* `lt_is_dark_background()` convenience (luminance threshold on the bg query) — what most callers actually want.
+- *Planned:* a **theme-changed event**: mode `2031` / `CSI ? 996 n` is the newer cross-terminal "color scheme notification" mechanism (kitty, ghostty, foot). `OSC 11` answers point-in-time; mode 2031 delivers *change events* when the user flips OS theme mid-session — falls out almost free once the query path exists, and libterm already has the event loop to surface it.
+- *Planned:* color *setting* exposed only via the kitty color stack (push/pop), gated on detection — arbitrary palette writes are how apps leave terminals in a broken state, so not offering them is a feature.
 
 **Notes / open questions.**
-- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — same shape as the kitty keyboard negotiation above.
+- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — the machinery already exists from the kitty keyboard negotiation above.
 - **POSIX-first.** Classic-console / ConPTY support for these OSC color queries is limited, so this would carry a documented Windows caveat (as the input model does).
+- **Multiplexers.** tmux answers `OSC 10`/`11` itself (with its own idea of colors), and passthrough for `OSC 21` is unreliable — needs a documented caveat next to the Windows one.
 - Complements `lt_detect_color_depth` (which reports *how many* colors, but nothing about light/dark or the actual palette).
-- Exact escape codes and the public API surface to be pinned at design time, per the kitty color-control spec.
+- Exact escape codes and the public API surface for the shipped slice are pinned in `docs/specs/2026-06-04-color-query-design.md`; the remaining slices (mode 2031 events, kitty color stack) are still to be designed.
 
 ---
 

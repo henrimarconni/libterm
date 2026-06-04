@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef LIBTERM_BENCH_WIDTH
@@ -186,4 +187,14 @@ int lt__plat_kitty_disable(void) {
   if (rc != LT_OK)
     return rc;
   return lt__plat_flush();
+}
+
+/* Monotonic milliseconds for input-side deadlines (color queries). Lives here
+ * rather than plat_input.c because that TU is #included by a white-box test
+ * after <string.h>, where the feature-test macro CLOCK_MONOTONIC needs would
+ * arrive too late; this TU already defines _DEFAULT_SOURCE on line 1. */
+long long lt__posix_now_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }

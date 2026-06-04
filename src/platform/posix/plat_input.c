@@ -5,6 +5,7 @@
 #include "posix_resize.h"
 #include <errno.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
@@ -49,6 +50,34 @@ static void lt__posix_pending_push(const unsigned char *bytes, size_t n) {
   lt__posix_pending_pos = 0;
 }
 
+/* Raw bytes captured off the tty while a color query (lt__plat_query_color)
+ * was waiting for its reply, re-consumed as the byte source AHEAD of the fd
+ * by the readers below — so an escape sequence typed during the query window
+ * re-assembles into its real event. Distinct from lt__posix_pending above,
+ * which replays bytes as standalone EVENTS (the LT_INPUT_ESC two-event
+ * model); routing those through the decoder would re-fold Alt combos. */
+#define LT__PUSHBACK_CAP 64
+static unsigned char lt__posix_pushback[LT__PUSHBACK_CAP];
+static size_t lt__posix_pushback_head = 0; /* read position */
+static size_t lt__posix_pushback_tail = 0; /* write position */
+
+static void lt__posix_pushback_push(unsigned char b) {
+  size_t next = (lt__posix_pushback_tail + 1) % LT__PUSHBACK_CAP;
+  if (next == lt__posix_pushback_head)
+    return; /* full: drop the newest byte (bounded loss, same policy as
+               lt__posix_pending's truncating push) */
+  lt__posix_pushback[lt__posix_pushback_tail] = b;
+  lt__posix_pushback_tail = next;
+}
+
+static bool lt__posix_pushback_pop(unsigned char *out) {
+  if (lt__posix_pushback_head == lt__posix_pushback_tail)
+    return false;
+  *out = lt__posix_pushback[lt__posix_pushback_head];
+  lt__posix_pushback_head = (lt__posix_pushback_head + 1) % LT__PUSHBACK_CAP;
+  return true;
+}
+
 static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
                                        size_t want) {
   size_t len = have;
@@ -61,6 +90,16 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
   int rc = 0;
 
   while (len < want) {
+    unsigned char pb;
+    if (lt__posix_pushback_pop(&pb)) {
+      /* Same continuation check as the fd path below. */
+      if ((pb & 0xC0) != 0x80) {
+        lt__posix_pending_push(&pb, 1);
+        break;
+      }
+      buf[len++] = pb;
+      continue;
+    }
     /* Same grace period as the escape-sequence reader: a multi-byte UTF-8
      * character can arrive fragmented, and a zero timeout would truncate it
      * into a spurious U+FFFD. See LT__ESC_SEQ_TIMEOUT_MS. */
@@ -102,6 +141,8 @@ static size_t lt__posix_read_utf8_tail(unsigned char *buf, size_t have,
  * *out on success; false on timeout/EOF/error. Mirrors the timeout used by the
  * UTF-8 and escape-tail readers. */
 static bool lt__posix_read_one_grace(unsigned char *out) {
+  if (lt__posix_pushback_pop(out))
+    return true;
   int ttyfd = lt__posix_get_tty_fd();
   if (ttyfd < 0)
     return false;
@@ -554,65 +595,72 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
     if (lt__posix_pending_pop(ev))
       return LT_OK;
 
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(ttyfd, &rfds);
-    if (rfd >= 0)
-      FD_SET(rfd, &rfds);
+    unsigned char pb;
+    if (lt__posix_pushback_pop(&pb)) {
+      /* Replay a byte stashed during a color query as if freshly read. */
+      ch = (lt_uchar)pb;
+      n = 1;
+    } else {
+      fd_set rfds;
+      FD_ZERO(&rfds);
+      FD_SET(ttyfd, &rfds);
+      if (rfd >= 0)
+        FD_SET(rfd, &rfds);
 
-    memset(&tv, 0, sizeof(tv));
-    tv_ptr = NULL;
+      memset(&tv, 0, sizeof(tv));
+      tv_ptr = NULL;
 
-    if (timeout_ms >= 0) {
-      tv.tv_sec = timeout_ms / 1000;
-      tv.tv_usec = (timeout_ms % 1000) * 1000;
-      tv_ptr = &tv;
-    }
-
-    int maxfd = ttyfd;
-    if (rfd > maxfd)
-      maxfd = rfd;
-
-    rc = select(maxfd + 1, &rfds, NULL, NULL, tv_ptr);
-    if (rc == 0)
-      return LT_ERR_NO_EVENT;
-
-    if (rc < 0) {
-      if (errno == EINTR)
-        return LT_ERR_NO_EVENT;
-      lt__g.last_errno = errno;
-      return LT_ERR_POLL;
-    }
-
-    if (rfd >= 0 && FD_ISSET(rfd, &rfds)) {
-      unsigned char drain[64];
-      while (read(rfd, drain, sizeof(drain)) > 0) {
+      if (timeout_ms >= 0) {
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        tv_ptr = &tv;
       }
 
-      szrc = lt__plat_get_size(&new_w, &new_h);
-      if (szrc != LT_OK)
-        continue;
+      int maxfd = ttyfd;
+      if (rfd > maxfd)
+        maxfd = rfd;
 
-      if (new_w <= 0 || new_h <= 0)
-        continue;
+      rc = select(maxfd + 1, &rfds, NULL, NULL, tv_ptr);
+      if (rc == 0)
+        return LT_ERR_NO_EVENT;
 
-      if (new_w == lt__g.width && new_h == lt__g.height)
-        continue;
+      if (rc < 0) {
+        if (errno == EINTR)
+          return LT_ERR_NO_EVENT;
+        lt__g.last_errno = errno;
+        return LT_ERR_POLL;
+      }
 
-      rrc = lt__buffer_resize(new_w, new_h);
-      if (rrc != LT_OK)
-        return rrc;
+      if (rfd >= 0 && FD_ISSET(rfd, &rfds)) {
+        unsigned char drain[64];
+        while (read(rfd, drain, sizeof(drain)) > 0) {
+        }
 
-      lt__g.cur_x = -1;
-      lt__g.cur_y = -1;
+        szrc = lt__plat_get_size(&new_w, &new_h);
+        if (szrc != LT_OK)
+          continue;
 
-      ev->type = LT_EVENT_RESIZE;
-      ev->w = new_w;
-      ev->h = new_h;
-      return LT_OK;
+        if (new_w <= 0 || new_h <= 0)
+          continue;
+
+        if (new_w == lt__g.width && new_h == lt__g.height)
+          continue;
+
+        rrc = lt__buffer_resize(new_w, new_h);
+        if (rrc != LT_OK)
+          return rrc;
+
+        lt__g.cur_x = -1;
+        lt__g.cur_y = -1;
+
+        ev->type = LT_EVENT_RESIZE;
+        ev->w = new_w;
+        ev->h = new_h;
+        return LT_OK;
+      }
+
+      n = read(ttyfd, &ch, 1);
     }
-
-    n = read(ttyfd, &ch, 1);
 
     if (n > 0) {
       /* ESC or a standalone control byte -> the shared decoder. Printable and
@@ -636,6 +684,16 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
             if (consumed < len)
               lt__posix_pending_push(seq + consumed, len - consumed);
             return LT_OK;
+          }
+
+          if (m == LT__KEY_DISCARD) {
+            /* Recognized bytes (a stray OSC reply) that yield no event. */
+            if (consumed < len) {
+              memmove(seq, seq + consumed, len - consumed);
+              len -= consumed;
+              continue; /* re-decode the remainder */
+            }
+            goto outer_continue; /* nothing left: wait for fresh input */
           }
 
           if (m == LT__KEY_PARTIAL && len < sizeof(seq)) {
@@ -715,6 +773,7 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
 
     lt__g.last_errno = errno;
     return LT_ERR_READ;
+  outer_continue:;
   }
   return LT_OK;
 }
@@ -734,4 +793,123 @@ int lt__plat_set_mouse(int enable) {
   }
   static const char off[] = "\x1b[?1006l\x1b[?1000l";
   return lt__plat_write(off, sizeof(off) - 1);
+}
+
+int lt__plat_query_color(int what, uint32_t *rgb, int timeout_ms) {
+  int ttyfd = lt__posix_get_tty_fd();
+  if (ttyfd < 0)
+    return LT_ERR_POLL;
+
+  /* Emit the query: OSC 10/11 for the defaults, OSC 4;<idx> for the palette.
+   * BEL-terminated; replies may use BEL or ST and we accept both. */
+  char q[24];
+  int qlen;
+  if (what == LT_COLOR_DEFAULT_FG) {
+    memcpy(q, "\x1b]10;?\x07", 7);
+    qlen = 7;
+  } else if (what == LT_COLOR_DEFAULT_BG) {
+    memcpy(q, "\x1b]11;?\x07", 7);
+    qlen = 7;
+  } else {
+    qlen = snprintf(q, sizeof(q), "\x1b]4;%d;?\x07", what);
+  }
+
+  int rc = lt__plat_write(q, (size_t)qlen);
+  if (rc != LT_OK)
+    return rc;
+  rc = lt__plat_flush();
+  if (rc != LT_OK)
+    return rc;
+
+  long long deadline = lt__posix_now_ms() + timeout_ms;
+
+  /* Scan the input stream for the reply. Bytes that aren't the reply (the
+   * user typing during the window) go to the pushback ring, replayed by the
+   * normal event loop afterwards. A reply to a different OSC number, or a
+   * malformed one, is discarded and the wait continues. */
+  enum { SCAN, ESC_SEEN, COLLECT, COLLECT_ESC } st = SCAN;
+  char reply[64];
+  size_t rlen = 0;
+  bool overflow = false;
+
+  for (;;) {
+    long long remaining = deadline - lt__posix_now_ms();
+    if (remaining <= 0)
+      return LT_ERR_NO_EVENT;
+
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(ttyfd, &rfds);
+    struct timeval tv = {.tv_sec = (time_t)(remaining / 1000),
+                         .tv_usec = (suseconds_t)((remaining % 1000) * 1000)};
+    int src = select(ttyfd + 1, &rfds, NULL, NULL, &tv);
+    if (src < 0) {
+      if (errno == EINTR)
+        continue;
+      lt__g.last_errno = errno;
+      return LT_ERR_POLL;
+    }
+    if (src == 0)
+      return LT_ERR_NO_EVENT;
+
+    unsigned char b;
+    ssize_t n = read(ttyfd, &b, 1);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      lt__g.last_errno = errno;
+      return LT_ERR_READ;
+    }
+    if (n == 0)
+      return LT_ERR_NO_EVENT; /* EOF: no reply is coming */
+
+    bool reply_done = false;
+    switch (st) {
+    case SCAN:
+      if (b == 0x1b)
+        st = ESC_SEEN;
+      else
+        lt__posix_pushback_push(b);
+      break;
+    case ESC_SEEN:
+      if (b == ']') {
+        st = COLLECT;
+        rlen = 0;
+        overflow = false;
+      } else {
+        /* Not a reply: both bytes belong to the user's input. */
+        lt__posix_pushback_push(0x1b);
+        lt__posix_pushback_push(b);
+        st = SCAN;
+      }
+      break;
+    case COLLECT:
+      if (b == 0x07) { /* BEL-terminated reply */
+        reply_done = true;
+        st = SCAN;
+      } else if (b == 0x1b) {
+        st = COLLECT_ESC;
+      } else if (rlen < sizeof(reply)) {
+        reply[rlen++] = (char)b;
+      } else {
+        overflow = true; /* overlong: drain to the terminator, then drop */
+      }
+      break;
+    case COLLECT_ESC:
+      if (b == '\\') { /* ST-terminated reply */
+        reply_done = true;
+        st = SCAN;
+      } else {
+        st = SCAN; /* malformed ESC inside the payload */
+      }
+      break;
+    }
+
+    if (reply_done) {
+      if (!overflow &&
+          lt__color_parse_osc_reply(reply, rlen, what, rgb) == LT_OK)
+        return LT_OK;
+      /* wrong number / malformed / overlong: keep waiting for the deadline */
+    }
+  }
 }
