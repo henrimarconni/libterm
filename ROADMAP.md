@@ -218,6 +218,7 @@ A feature is listed here only if it has been observed working on a real terminal
 | Bench harness (`bench/bench_present.c`) | [ ] | [x] three scenarios (no-change / one-cell / full-repaint) timed via QPC |
 | SGR / color emission | [x] byte-tested via pty (`tests/test_posix_sgr_output.c`) | [x] shared `lt__emit_sgr` (`src/shared/sgr.c`); colors visually confirmed in Windows Terminal via the bench SGR workloads (`bench/bench_present.c`, real `WriteFile` output) + automated byte test (`tests/test_win_sgr_output.c`) |
 | Runtime color-depth detection (`lt_detect_color_depth`) | [x] `$COLORTERM`/`$TERM` → `LT_OUTPUT_*` ceiling; hermetic `setenv` test (`tests/test_detect_color_depth.c`), wired into `examples/truecolor.c` | [x] same standard-C path (test harness POSIX-only) |
+| Color querying (`lt_query_color`, `lt_is_dark_background`) | [x] OSC 10/11/4 round-trip with monotonic deadline; `rgb:`/`rgba:` reply parser; typed input preserved (pushback ring); stray replies consumed by the decoder. Pty test `tests/test_color_query.c` + parser test `tests/test_color_parse.c`; demo `examples/theme.c` | [x] native `GetConsoleScreenBufferInfoEx` color table (immediate; palette > 15 → `LT_ERR_UNSUPPORTED_TERM`); CSBI mapping test `tests/test_win_color_query.c` (runs on Windows CI; MinGW cross-compiled) |
 | Mouse events | [~] SGR (1006) reports parsed into `LT_EVENT_MOUSE` (button/wheel/release, 0-based coords, shift/ctrl/alt/motion mods); tracking enabled via `lt_set_input_mode(LT_INPUT_MOUSE)`, disabled on shutdown. Parser unit-tested incl. malformed/overflow rejection (`tests/test_posix_input_parse.c`); live-terminal click verification still pending | [~] `MOUSE_EVENT_RECORD` parsed into `LT_EVENT_MOUSE` (button/wheel/release, viewport-relative 0-based coords, shift/ctrl/alt/motion mods); `ENABLE_MOUSE_INPUT` toggled via the `lt__plat_set_mouse` hook. Mapper unit-tested (`tests/test_win_mouse.c`); live-terminal click verification still pending |
 
 ---
@@ -277,9 +278,9 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 - *Planned:* color *setting* exposed only via the kitty color stack (push/pop), gated on detection — arbitrary palette writes are how apps leave terminals in a broken state, so not offering them is a feature.
 
 **Notes / open questions.**
-- Querying needs a round-trip: emit the OSC, then read the terminal's reply off the input stream with a timeout and graceful fallback if it doesn't answer — the machinery already exists from the kitty keyboard negotiation above.
-- **POSIX-first.** Classic-console / ConPTY support for these OSC color queries is limited, so this would carry a documented Windows caveat (as the input model does).
-- **Multiplexers.** tmux answers `OSC 10`/`11` itself (with its own idea of colors), and passthrough for `OSC 21` is unreliable — needs a documented caveat next to the Windows one.
+- The query round-trip machinery (emit the OSC, read the reply off the input stream with a deadline, stash interleaved input for replay, consume stray/late replies in the decoder) was built by slice 1 in `lt__plat_query_color` / the pushback ring — and is exactly what the mode-2031 slice will reuse. (The kitty *keyboard* negotiation, by contrast, is a blind push with no reply reading.)
+- **Windows** ended up better than the anticipated "documented caveat": no OSC at all — the console color table answers natively on every Windows version (only palette indexes above 15 are out of reach, documented in the README).
+- **Multiplexers.** tmux answers `OSC 10`/`11` itself (with its own idea of colors) — documented in the README. `OSC 21` passthrough is unreliable; that caveat lands with the color-stack slice.
 - Complements `lt_detect_color_depth` (which reports *how many* colors, but nothing about light/dark or the actual palette).
 - Exact escape codes and the public API surface for the shipped slice are pinned in `docs/specs/2026-06-04-color-query-design.md`; the remaining slices (mode 2031 events, kitty color stack) are still to be designed.
 
