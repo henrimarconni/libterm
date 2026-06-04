@@ -92,9 +92,11 @@ jobs:
   # Compile-check the Windows code path from Linux via the MinGW-w64 toolchain
   # (cross binaries can't be run without wine — this verifies they build).
   #
-  # Native MSVC is intentionally not built here: the library currently fails to
-  # compile under MSVC (winnt.h "No Target Architecture" out of errors.c), a
-  # pre-existing portability issue separate from CI. MinGW covers the Win32 path.
+  # MinGW covers the Win32 path: cross-compiled here, built AND executed
+  # natively by windows-mingw-native below. MSVC remains unvalidated — the
+  # previously recorded blocker (winnt.h "No Target Architecture" out of
+  # errors.c) looks stale (errors.c's include chain has no Windows headers);
+  # settling it is a future compile-only experiment.
   # --------------------------------------------------------------------------
   build-mingw:
     name: windows-mingw-cross
@@ -115,6 +117,36 @@ jobs:
             -DLIBTERM_BUILD_BENCH=OFF
       - name: Build
         run: cmake --build build-mingw --parallel
+
+  # --------------------------------------------------------------------------
+  # Native Windows build + test execution. Uses the runner-preinstalled MinGW
+  # GCC + Ninja (same compiler family as the cross job — only execution is
+  # new). Runs the 12 Windows-registered tests: 8 portable + 4 test_win_*
+  # (all headless-by-design: fabricated CSBI, pipe-redirected stdout, pure
+  # record mappers). Examples/bench stay off (bench timing is QPC-tuned but
+  # not gating; examples need no Windows gate).
+  # --------------------------------------------------------------------------
+  windows-mingw-native:
+    name: windows-mingw-native
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Debug `
+            -DLIBTERM_BUILD_EXAMPLES=OFF `
+            -DLIBTERM_BUILD_BENCH=OFF
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
   # --------------------------------------------------------------------------
   # Install/export wiring: stage-install + find_package(Libterm) consumer,
