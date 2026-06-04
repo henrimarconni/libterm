@@ -20,6 +20,9 @@ may contain breaking API changes; patch versions never do).
   `find_package(Libterm)` yields working `Libterm::libterm` / `Libterm::static`
   / `Libterm::shared` targets; smoke-tested by `tests/smoke_install.sh`.
 - macOS: portable test subset + the pty lifecycle canary run in CI (`<util.h>`/no-libutil shims; full pty-test parity tracked in ROADMAP Known blockers).
+- Native Windows CI job (`windows-mingw-native`: MinGW build + ctest on
+  `windows-latest`, running the portable + Windows test suites); `LT_VERSION_*`
+  header constants synced with the project version (0.2.0).
 
 ### Changed
 - Key decoder consumes and discards stray OSC replies instead of emitting
