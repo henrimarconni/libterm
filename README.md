@@ -29,6 +29,23 @@ ctest --test-dir build      # run the test suite
 ./build/examples/hello      # try an example
 ```
 
+### Prebuilt binaries
+
+Every [release](https://github.com/rizukirr/libterm/releases) ships prebuilt
+install trees for Linux (x86_64 / aarch64 / riscv64), Windows (x86_64,
+MinGW), and macOS (arm64 / x86_64), with a `SHA256SUMS` file. The x86_64 and
+Linux-arm builds select their SIMD backend at runtime from the CPU, so one
+binary is fast everywhere it can be and safe everywhere else.
+
+```sh
+tar -xzf libterm-v0.1.0-linux-x86_64.tar.gz
+sha256sum -c SHA256SUMS --ignore-missing
+cmake -B build -DCMAKE_PREFIX_PATH=$PWD/libterm-v0.1.0-linux-x86_64   # then find_package(Libterm)
+```
+
+macOS note: the binaries are unsigned — Gatekeeper users can
+`xattr -d com.apple.quarantine` the extracted files or build from source.
+
 ## Quick start
 
 ```c
