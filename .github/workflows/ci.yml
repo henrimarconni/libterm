@@ -66,6 +66,7 @@ jobs:
           - { name: linux-gcc-avx512,   os: ubuntu-latest, cc: gcc,   simd: avx512, wae: 'ON',  run_tests: false, extra: '' }
           - { name: linux-clang-scalar, os: ubuntu-latest, cc: clang, simd: scalar, wae: 'ON',  run_tests: true,  extra: '' }
           - { name: linux-clang-avx2,   os: ubuntu-latest, cc: clang, simd: avx2,   wae: 'OFF', run_tests: true,  extra: '' }
+          - { name: linux-gcc-dispatch, os: ubuntu-latest, cc: gcc,   simd: auto,   wae: 'ON',  run_tests: true,  extra: '' }
           # macOS arm64 / neon — runs the portable suite (examples/bench stay off).
           - { name: macos-clang-neon,   os: macos-latest,  cc: clang, simd: auto,   wae: 'OFF', run_tests: true,  extra: '-DLIBTERM_BUILD_EXAMPLES=OFF -DLIBTERM_BUILD_BENCH=OFF' }
     env:

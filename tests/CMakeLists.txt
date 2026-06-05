@@ -25,6 +25,18 @@ libterm_add_test(test_simd_diff)
 libterm_add_test(test_keymap)
 libterm_add_test(test_detect_color_depth)
 libterm_add_test(test_color_parse)
+# Dispatch builds: tell the SIMD tests which backends were compiled and
+# register the dispatcher sanity test. (Static builds: no-op.)
+if(LIBTERM_SIMD_BACKENDS)
+    set(LIBTERM_SIMD_TEST_DEFS LT_SIMD_DISPATCH)
+    foreach(backend IN LISTS LIBTERM_SIMD_BACKENDS)
+        string(TOUPPER ${backend} LIBTERM_SIMD_BU)
+        list(APPEND LIBTERM_SIMD_TEST_DEFS LT_SIMD_HAVE_${LIBTERM_SIMD_BU})
+    endforeach()
+    target_compile_definitions(test_simd_diff PRIVATE ${LIBTERM_SIMD_TEST_DEFS})
+    libterm_add_test(test_simd_dispatch)
+    target_compile_definitions(test_simd_dispatch PRIVATE ${LIBTERM_SIMD_TEST_DEFS})
+endif()
 if(WIN32)
     libterm_add_test(test_win_sgr_output)
     libterm_add_test(test_win_key)
@@ -147,10 +159,20 @@ endif()
 # so the assertion is neither runnable nor meaningful there. CI runs it on Linux.
 # Linux-only: the script assumes ELF objects and GNU objdump output; Mach-O would false-fail.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND DEFINED LIBTERM_SIMD_RESOLVED)
-    add_test(
-        NAME test_simd_emitted
-        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
-                ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
+    if(LIBTERM_SIMD_BACKENDS)
+        # Dispatch build: every compiled backend object must emit its ISA.
+        foreach(backend IN LISTS LIBTERM_SIMD_BACKENDS)
+            add_test(
+                NAME test_simd_emitted_${backend}
+                COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
+                        ${backend} ${CMAKE_BINARY_DIR})
+        endforeach()
+    else()
+        add_test(
+            NAME test_simd_emitted
+            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/assert_simd_emitted.sh
+                    ${LIBTERM_SIMD_RESOLVED} ${CMAKE_BINARY_DIR})
+    endif()
 endif()
 
 # Assert the shared library actually exports its public API (guards B2: the
