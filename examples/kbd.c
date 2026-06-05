@@ -764,7 +764,6 @@ int main(void) {
     return 1;
   }
 
-  lt_hide_cursor();
   draw_all(depth);
   lt_present();
 

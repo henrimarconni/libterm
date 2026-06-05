@@ -68,7 +68,6 @@ int main(void) {
 
   int depth = lt_detect_color_depth();
   lt_set_output_mode(depth);
-  lt_hide_cursor();
 
   /* ---- query phase: 500 ms timeouts so a silent terminal stalls briefly ----
    */

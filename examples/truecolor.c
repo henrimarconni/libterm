@@ -31,7 +31,6 @@ int main(void) {
       depth == LT_OUTPUT_TRUECOLOR
           ? "truecolor detected"
           : (depth == LT_OUTPUT_256 ? "256-color detected" : "normal detected");
-  lt_hide_cursor();
 
   char title[128];
   snprintf(title, sizeof title,

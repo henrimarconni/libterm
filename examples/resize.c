@@ -135,9 +135,6 @@ int main(void) {
     return 1;
   }
 
-  lt_hide_cursor(); /* cursor is visible by default; it would otherwise park
-                     * (and blink) at the end of the last painted row */
-
   int resizes = 0;
   draw(resizes);
 

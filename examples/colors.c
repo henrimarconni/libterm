@@ -19,8 +19,6 @@ int main(void) {
     return 1;
   }
 
-  lt_hide_cursor();
-
   puts_at(2, 1, "libterm color demo (press q or Esc to quit)", LT_DEFAULT,
           LT_DEFAULT);
 

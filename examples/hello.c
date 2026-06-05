@@ -9,7 +9,6 @@ int main(void) {
     return 1;
   }
 
-  lt_hide_cursor();
   const char *msg = "resize me; press q or Esc to quit";
   for (int i = 0; msg[i]; i++)
     lt_set_cell(2 + i, 1, (lt_uchar)msg[i], 0, 0);
