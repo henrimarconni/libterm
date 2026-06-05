@@ -22,6 +22,7 @@
 #endif
 #include <fcntl.h>
 #include <signal.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -42,6 +43,24 @@ static size_t drain(char *buf, size_t cap) {
     total += (size_t)n;
   }
   return total;
+}
+
+/* Evidence of a full repaint, via two independent signals so the assertion
+ * survives renderer-strategy changes: (a) the cursor was positioned at the
+ * LAST row (only a full repaint touches blank rows), or (b) at least one
+ * full row's worth of space glyphs was emitted (blank cells are painted as
+ * spaces). A diff-only present after a row-0-only redraw produces neither:
+ * no move below row 1 and ~zero spaces. */
+static int full_repaint_seen(const char *buf, size_t n, int rows, int cols) {
+  char last_row_move[16];
+  snprintf(last_row_move, sizeof last_row_move, "\x1b[%d;1H", rows);
+  if (memmem(buf, n, last_row_move, strlen(last_row_move)) != NULL)
+    return 1;
+  size_t spaces = 0;
+  for (size_t i = 0; i < n; i++)
+    if (buf[i] == ' ')
+      spaces++;
+  return spaces >= (size_t)cols;
 }
 
 static void set_size(int rows, int cols) {
@@ -137,7 +156,7 @@ int main(void) {
     assert(lt_set_cell(0, 0, 'B', LT_WHITE, LT_DEFAULT) == LT_OK);
     assert(lt_present() == LT_OK);
     size_t n = drain(buf, sizeof buf);
-    assert(memmem(buf, n, "\x1b[10;1H", 7) != NULL); /* last row stamped */
+    assert(full_repaint_seen(buf, n, 10, 40));
   }
 
   /* Same hole, width axis: shrink 40 -> 30 columns. */
@@ -151,7 +170,7 @@ int main(void) {
     assert(lt_set_cell(0, 0, 'C', LT_WHITE, LT_DEFAULT) == LT_OK);
     assert(lt_present() == LT_OK);
     size_t n = drain(buf, sizeof buf);
-    assert(memmem(buf, n, "\x1b[10;1H", 7) != NULL);
+    assert(full_repaint_seen(buf, n, 10, 30));
   }
 
   /* Burst coalescing: several SIGWINCHes around one settling size yield
