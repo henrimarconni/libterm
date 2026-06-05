@@ -1,3 +1,12 @@
+# Tests are assert-based; Release's -DNDEBUG would strip them to vacuous
+# no-ops (or worse: side-effecting asserts vanish — caught live when the
+# release workflow's Release-mode suite aborted/false-passed). Re-enable
+# asserts for everything in this directory; the library under test keeps
+# its real configuration flags.
+if(NOT MSVC)
+    add_compile_options(-UNDEBUG)
+endif()
+
 set(LIBTERM_LINK_TARGET libterm_static)
 if(NOT LIBTERM_BUILD_STATIC)
     set(LIBTERM_LINK_TARGET libterm_shared)
