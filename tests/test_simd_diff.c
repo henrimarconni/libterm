@@ -3,6 +3,20 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef LT_SIMD_DISPATCH
+#include "intrinsics/dispatch.h"
+
+/* In dispatch builds the suite below runs once through the canonical
+ * forwarders and then once per compiled backend the running CPU supports.
+ * The function-like redirection keeps every test body byte-identical. */
+static lt__simd_diff_fn g_differ = lt__simd_diff_first_differ_cell;
+static lt__simd_diff_fn g_equal = lt__simd_diff_first_equal_cell;
+static lt__simd_fill_fn g_fill = lt__simd_fill_cells;
+#define lt__simd_diff_first_differ_cell g_differ
+#define lt__simd_diff_first_equal_cell g_equal
+#define lt__simd_fill_cells g_fill
+#endif
+
 /* Large enough that the untouched-region guard below has headroom past the
  * widest emulated vector (qemu SVE/RVV under -cpu max). */
 #define MAXN 64
@@ -103,7 +117,7 @@ static void test_fill(int n) {
     assert(memcmp(&buf[i], ref, sizeof(struct lt_cell)) == 0);
 }
 
-int main(void) {
+static void run_suite(void) {
   const int counts[] = {0, 1, 2, 3, 4, 5, 8, 9, 16, 17};
 
   for (size_t c = 0; c < sizeof counts / sizeof counts[0]; c++) {
@@ -112,6 +126,45 @@ int main(void) {
     test_reserved_distinguishes(counts[c]);
     test_fill(counts[c]);
   }
+
+  return;
+}
+
+int main(void) {
+  /* Canonical names (in dispatch builds: the active backend, via the
+   * forwarders; in static builds: the single compiled backend). */
+  run_suite();
+
+#ifdef LT_SIMD_DISPATCH
+/* And each compiled backend directly, skipping ones this CPU can't run. */
+#define LT__RUN_BACKEND(suffix, name)                                          \
+  do {                                                                         \
+    if (lt__simd_backend_supported(name)) {                                    \
+      g_differ = lt__simd_diff_first_differ_cell_##suffix;                     \
+      g_equal = lt__simd_diff_first_equal_cell_##suffix;                       \
+      g_fill = lt__simd_fill_cells_##suffix;                                   \
+      run_suite();                                                             \
+    }                                                                          \
+  } while (0)
+#ifdef LT_SIMD_HAVE_SCALAR
+  LT__RUN_BACKEND(scalar, "scalar");
+#endif
+#ifdef LT_SIMD_HAVE_AVX2
+  LT__RUN_BACKEND(avx2, "avx2");
+#endif
+#ifdef LT_SIMD_HAVE_AVX512
+  LT__RUN_BACKEND(avx512, "avx512");
+#endif
+#ifdef LT_SIMD_HAVE_NEON
+  LT__RUN_BACKEND(neon, "neon");
+#endif
+#ifdef LT_SIMD_HAVE_SVE
+  LT__RUN_BACKEND(sve, "sve");
+#endif
+#ifdef LT_SIMD_HAVE_RVV
+  LT__RUN_BACKEND(rvv, "rvv");
+#endif
+#endif /* LT_SIMD_DISPATCH */
 
   return 0;
 }
