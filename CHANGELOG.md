@@ -7,14 +7,6 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
-### Added
-- Runtime SIMD dispatch: `LIBTERM_SIMD=auto` now compiles every backend the
-  target architecture supports and selects at startup from CPU capabilities
-  (x86_64: scalar→AVX2→AVX-512 via cpuid; aarch64: NEON→SVE via hwcap;
-  riscv64: scalar→RVV via hwcap) — one binary, fast on capable CPUs, no
-  illegal-instruction risk on older ones. Explicit `LIBTERM_SIMD=<backend>`
-  still builds a single static backend.
-
 ## [0.1.0] - 2026-06-05
 
 First release.
@@ -42,6 +34,12 @@ First release.
   `find_package(Libterm)` yields working `Libterm::libterm` / `Libterm::static`
   / `Libterm::shared` targets; smoke-tested by `tests/smoke_install.sh` in
   default and shared-only configurations.
+- Runtime SIMD dispatch: `LIBTERM_SIMD=auto` now compiles every backend the
+  target architecture supports and selects at startup from CPU capabilities
+  (x86_64: scalar→AVX2→AVX-512 via cpuid; aarch64: NEON→SVE via hwcap;
+  riscv64: scalar→RVV via hwcap) — one binary, fast on capable CPUs, no
+  illegal-instruction risk on older ones. Explicit `LIBTERM_SIMD=<backend>`
+  still builds a single static backend.
 - CI: Linux (4 compiler/SIMD configs), macOS (portable subset + pty lifecycle
   canary; full pty-test parity tracked in ROADMAP Known blockers), native
   Windows (`windows-mingw-native`: MinGW build + ctest), MinGW cross-build,
