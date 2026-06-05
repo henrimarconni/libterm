@@ -3,6 +3,7 @@
 #include "intrinsics/diff.h"
 #include "lib/arena.h"
 #include <stdlib.h>
+#include <string.h>
 
 #define ARENA_BYTES_INIT 4096
 
@@ -57,6 +58,35 @@ int lt__buffer_resize(int w, int h) {
   for (int i = 0; i < h; i++)
     lt__g.dirty_rows[i] = true;
 
+  return LT_OK;
+}
+
+/* Apply a terminal size change end to end: resize the cell buffers, reset
+ * the cursor cache, and force the next present to repaint every cell — the
+ * terminal's reflowed content no longer matches the (freshly blanked) front
+ * buffer, so a diffing present would skip blank-equal cells and leave stale
+ * glyphs on screen (the resize ghost bug; same out-of-band desync rationale
+ * as lt_invalidate). Fills *ev as the LT_EVENT_RESIZE to surface. Returns
+ * LT_ERR_NO_EVENT for a non-positive or unchanged size (callers continue
+ * their read loop), a buffer error code on allocation failure, else LT_OK. */
+int lt__handle_resize(int new_w, int new_h, struct lt_event *ev) {
+  if (new_w <= 0 || new_h <= 0)
+    return LT_ERR_NO_EVENT;
+  if (new_w == lt__g.width && new_h == lt__g.height)
+    return LT_ERR_NO_EVENT;
+
+  int rc = lt__buffer_resize(new_w, new_h);
+  if (rc != LT_OK)
+    return rc;
+
+  lt__g.cur_x = -1;
+  lt__g.cur_y = -1;
+  lt__g.force_repaint = true;
+
+  memset(ev, 0, sizeof(*ev));
+  ev->type = LT_EVENT_RESIZE;
+  ev->w = new_w;
+  ev->h = new_h;
   return LT_OK;
 }
 
