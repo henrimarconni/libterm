@@ -49,8 +49,9 @@ jobs:
   # (ci.yml gates Debug; Release-only miscompiles would otherwise ship).
   # Cross lanes (riscv64, windows/MinGW) are build-only — the established
   # verification standard; their backends are correctness-tested in ci.yml.
-  # macos-13 is the Intel runner (deprecation-tracked by GitHub; migration
-  # path is an OSX_ARCHITECTURES cross-build from arm64 when forced).
+  # macos-15-intel is the Intel runner (macos-13 retired Dec 2025; this label
+  # is supported into 2027 — after that, an OSX_ARCHITECTURES cross-build
+  # from arm64 is the migration path).
   # ----------------------------------------------------------------------
   build:
     name: ${{ matrix.target }}
@@ -66,7 +67,7 @@ jobs:
           - { target: linux-riscv64,  os: ubuntu-latest,    method: cross,  toolchain: cmake/toolchains/riscv64-qemu.cmake, pkgs: gcc-riscv64-linux-gnu }
           - { target: windows-x86_64, os: ubuntu-latest,    method: cross,  toolchain: cmake/toolchains/mingw-w64.cmake,    pkgs: gcc-mingw-w64-x86-64 }
           - { target: macos-arm64,    os: macos-latest,     method: native, toolchain: '', pkgs: '' }
-          - { target: macos-x86_64,   os: macos-13,         method: native, toolchain: '', pkgs: '' }
+          - { target: macos-x86_64,   os: macos-15-intel,   method: native, toolchain: '', pkgs: '' }
     steps:
       - uses: actions/checkout@v6
         with:
