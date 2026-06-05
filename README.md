@@ -12,7 +12,7 @@ All identifiers use the `lt_` / `LT_` prefix.
 
 - **termbox2-compatible API** — `tb_`/`TB_` renamed to `lt_`/`LT_`; see the [Roadmap](ROADMAP.md) for per-symbol status.
 - **POSIX + Windows** — `/dev/tty` + termios raw mode, or the Win32 Console API. No `#ifdef` in shared code.
-- **Double-buffered diff rendering** with a SIMD-accelerated cell scan (AVX2 / AVX-512 / NEON / SVE / RVV, scalar fallback, auto-selected).
+- **Double-buffered diff rendering** with a SIMD-accelerated cell scan (AVX2 / AVX-512 / NEON / SVE / RVV, scalar fallback) — all backends for your architecture are compiled in and the best one is **selected at runtime** from CPU capabilities, so one binary is fast on capable CPUs and safe on all of them. Pin a single backend with `-DLIBTERM_SIMD=<backend>`.
 - **Unicode** — UTF-8 decode/encode, `wcwidth` (wide & zero-width handling), and grapheme clusters (combining marks, ZWJ emoji).
 - **Color** — 8-color, 256, 216-cube, grayscale, and 24-bit truecolor output modes, plus 7 attributes (bold, dim, italic, underline, blink, reverse, strike).
 - **Color querying** — `lt_query_color` / `lt_is_dark_background`: POSIX does a real OSC 10/11/4 round-trip (timeout-bounded; input typed during the query is preserved); Windows answers natively from the console color table (`GetConsoleScreenBufferInfoEx`) — immediate and version-independent, but palette indexes above 15 return `LT_ERR_UNSUPPORTED_TERM`. Under tmux, replies describe tmux's own colors (it answers OSC 10/11 itself); a terminal that doesn't answer yields `LT_ERR_NO_EVENT` after the timeout.
