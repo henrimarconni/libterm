@@ -25,8 +25,8 @@ jobs:
     name: clang-format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
       - name: Install pinned clang-format
@@ -72,7 +72,7 @@ jobs:
     env:
       CC: ${{ matrix.cc }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: 'latest'
@@ -103,7 +103,7 @@ jobs:
     name: windows-mingw-cross
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install MinGW-w64
         run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
       - uses: jwlawson/actions-setup-cmake@v2
@@ -134,7 +134,7 @@ jobs:
     env:
       CC: gcc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: 'latest'
@@ -157,7 +157,7 @@ jobs:
     name: install-smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: 'latest'
@@ -173,7 +173,7 @@ jobs:
     env:
       CC: clang
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: 'latest'
@@ -210,7 +210,7 @@ jobs:
           - { name: aarch64-sve,  toolchain: aarch64-qemu.cmake, simd: sve,  wae: 'ON',  pkgs: 'gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu qemu-user' }
           - { name: riscv64-rvv,  toolchain: riscv64-qemu.cmake, simd: rvv,  wae: 'OFF', pkgs: 'gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu qemu-user' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install cross toolchain + QEMU
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.pkgs }}
       - uses: jwlawson/actions-setup-cmake@v2
@@ -239,7 +239,7 @@ jobs:
     name: clang-tidy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install clang-tidy
         run: sudo apt-get update && sudo apt-get install -y clang-tidy
       - uses: jwlawson/actions-setup-cmake@v2

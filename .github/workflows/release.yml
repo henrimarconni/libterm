@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.TAG }}
       - name: Tag matches CMake VERSION
@@ -68,7 +68,7 @@ jobs:
           - { target: macos-arm64,    os: macos-latest,     method: native, toolchain: '', pkgs: '' }
           - { target: macos-x86_64,   os: macos-13,         method: native, toolchain: '', pkgs: '' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.TAG }}
       - uses: jwlawson/actions-setup-cmake@v2
@@ -100,7 +100,7 @@ jobs:
           else
             tar -czf "../libterm-${TAG}-${{ matrix.target }}.tar.gz" "libterm-${TAG}-${{ matrix.target }}"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: libterm-${{ matrix.target }}
           path: |
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
       - name: Generate SHA256SUMS
