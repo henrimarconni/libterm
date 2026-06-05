@@ -6,8 +6,12 @@
  *
  * Cases: positive (grow -> RESIZE with new w/h), edge (a no-op SIGWINCH with
  * the SAME size delivers no resize event — the path filters unchanged sizes),
- * and a second distinct resize (shrink) to show it's repeatable. */
-#define _DEFAULT_SOURCE
+ * a second distinct resize (shrink) to show it's repeatable, a duplicate-event
+ * check (the consumed resize is not followed by a duplicate), ghost-regression
+ * byte assertions (height primary, width pass: a forced full repaint positions
+ * the cursor at the new last row), and burst coalescing (several SIGWINCHes
+ * around one settling size yield exactly one event with the final size). */
+#define _GNU_SOURCE
 #include "libterm/libterm.h"
 
 #include <assert.h>
@@ -16,12 +20,48 @@
 #else
 #include <pty.h>
 #endif
+#include <fcntl.h>
 #include <signal.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 static int g_master = -1, g_slave = -1;
+
+/* Drain available master bytes (non-blocking) into buf; returns total read. */
+static size_t drain(char *buf, size_t cap) {
+  size_t total = 0;
+  int fl = fcntl(g_master, F_GETFL, 0);
+  fcntl(g_master, F_SETFL, fl | O_NONBLOCK);
+  for (;;) {
+    if (total >= cap)
+      break;
+    ssize_t n = read(g_master, buf + total, cap - total);
+    if (n <= 0)
+      break;
+    total += (size_t)n;
+  }
+  return total;
+}
+
+/* Evidence of a full repaint, via two independent signals so the assertion
+ * survives renderer-strategy changes: (a) the cursor was positioned at the
+ * LAST row (only a full repaint touches blank rows), or (b) at least one
+ * full row's worth of space glyphs was emitted (blank cells are painted as
+ * spaces). A diff-only present after a row-0-only redraw produces neither:
+ * no move below row 1 and ~zero spaces. */
+static int full_repaint_seen(const char *buf, size_t n, int rows, int cols) {
+  char last_row_move[16];
+  snprintf(last_row_move, sizeof last_row_move, "\x1b[%d;1H", rows);
+  if (memmem(buf, n, last_row_move, strlen(last_row_move)) != NULL)
+    return 1;
+  size_t spaces = 0;
+  for (size_t i = 0; i < n; i++)
+    if (buf[i] == ' ')
+      spaces++;
+  return spaces >= (size_t)cols;
+}
 
 static void set_size(int rows, int cols) {
   struct winsize ws;
@@ -83,6 +123,68 @@ int main(void) {
     assert(ev.type == LT_EVENT_RESIZE);
     assert(ev.w == 40);
     assert(ev.h == 12);
+  }
+
+  /* Exactly-once: the consumed resize must not be followed by a duplicate. */
+  {
+    struct lt_event ev;
+    memset(&ev, 0, sizeof ev);
+    assert(lt_peek_event(&ev, 0) == LT_ERR_NO_EVENT);
+  }
+
+  /* Ghost regression (the reported bug, primary = HEIGHT change): after a
+   * resize, the terminal still shows old (scrolled/reflowed) content, so the
+   * next present must repaint EVERY cell — including ones the app leaves
+   * blank — or stale glyphs survive. We assert libterm's emitted bytes
+   * position the cursor at the LAST row of the new size: only a forced full
+   * repaint touches blank rows. */
+  char buf[65536];
+  {
+    /* Paint something, present, and discard those bytes. */
+    assert(lt_set_cell(0, 0, 'A', LT_WHITE, LT_DEFAULT) == LT_OK);
+    assert(lt_present() == LT_OK);
+    (void)drain(buf, sizeof buf);
+
+    /* Height shrink 12 -> 10 (width stays 40). */
+    set_size(10, 40);
+    struct lt_event ev;
+    memset(&ev, 0, sizeof ev);
+    assert(lt_peek_event(&ev, 2000) == LT_OK);
+    assert(ev.type == LT_EVENT_RESIZE && ev.w == 40 && ev.h == 10);
+
+    /* App redraws only row 0; present must still stamp rows 1..9. */
+    assert(lt_set_cell(0, 0, 'B', LT_WHITE, LT_DEFAULT) == LT_OK);
+    assert(lt_present() == LT_OK);
+    size_t n = drain(buf, sizeof buf);
+    assert(full_repaint_seen(buf, n, 10, 40));
+  }
+
+  /* Same hole, width axis: shrink 40 -> 30 columns. */
+  {
+    set_size(10, 30);
+    struct lt_event ev;
+    memset(&ev, 0, sizeof ev);
+    assert(lt_peek_event(&ev, 2000) == LT_OK);
+    assert(ev.type == LT_EVENT_RESIZE && ev.w == 30 && ev.h == 10);
+
+    assert(lt_set_cell(0, 0, 'C', LT_WHITE, LT_DEFAULT) == LT_OK);
+    assert(lt_present() == LT_OK);
+    size_t n = drain(buf, sizeof buf);
+    assert(full_repaint_seen(buf, n, 10, 30));
+  }
+
+  /* Burst coalescing: several SIGWINCHes around one settling size yield
+   * exactly ONE event carrying the final dimensions. */
+  {
+    set_size(30, 100);
+    set_size(28, 90);
+    set_size(20, 60);
+    struct lt_event ev;
+    memset(&ev, 0, sizeof ev);
+    assert(lt_peek_event(&ev, 2000) == LT_OK);
+    assert(ev.type == LT_EVENT_RESIZE && ev.w == 60 && ev.h == 20);
+    memset(&ev, 0, sizeof ev);
+    assert(lt_peek_event(&ev, 200) == LT_ERR_NO_EVENT); /* no second event */
   }
 
   assert(lt_shutdown() == LT_OK);

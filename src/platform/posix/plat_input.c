@@ -640,23 +640,10 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
         if (szrc != LT_OK)
           continue;
 
-        if (new_w <= 0 || new_h <= 0)
-          continue;
-
-        if (new_w == lt__g.width && new_h == lt__g.height)
-          continue;
-
-        rrc = lt__buffer_resize(new_w, new_h);
-        if (rrc != LT_OK)
-          return rrc;
-
-        lt__g.cur_x = -1;
-        lt__g.cur_y = -1;
-
-        ev->type = LT_EVENT_RESIZE;
-        ev->w = new_w;
-        ev->h = new_h;
-        return LT_OK;
+        rrc = lt__handle_resize(new_w, new_h, ev);
+        if (rrc == LT_ERR_NO_EVENT)
+          continue; /* spurious/unchanged: keep waiting */
+        return rrc; /* LT_OK with the event filled, or the buffer error */
       }
 
       n = read(ttyfd, &ch, 1);

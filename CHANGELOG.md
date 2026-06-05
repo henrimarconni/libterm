@@ -7,6 +7,15 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Fixed
+- Resize no longer leaves stale terminal content on screen: a size change now
+  forces the next `lt_present` to repaint every cell (the terminal's
+  scrolled/reflowed content no longer matches libterm's blanked buffers, so
+  the diff previously skipped blank-equal cells — most visible after height
+  shrinks). Both platform resize paths now share `lt__handle_resize`. Resize
+  delivery semantics (exactly-once, burst coalescing, no-op suppression) are
+  now validated end-to-end.
+
 ## [0.1.0] - 2026-06-05
 
 First release.

@@ -75,6 +75,11 @@ void lt__buffer_free(void);
 /* Fill `count` cells of `buf` with a blank glyph in fg/bg (dispatches to the
  * SIMD fill backend). */
 void lt__buffer_clear(struct lt_cell *buf, int count, lt_attr fg, lt_attr bg);
+/* Apply a size change: resize buffers, reset the cursor cache, force a full
+ * repaint (resize ghosts otherwise — see buffer.c), and fill *ev as
+ * LT_EVENT_RESIZE. LT_ERR_NO_EVENT for non-positive/unchanged sizes;
+ * LT_ERR_MEM etc. from the buffer resize; LT_OK with *ev filled otherwise. */
+int lt__handle_resize(int new_w, int new_h, struct lt_event *ev);
 
 /* ---- utf8 (shared/utf8.c) ---- */
 /* Bytes in the UTF-8 sequence lead byte `c` begins: 1-4, or 0 for an invalid

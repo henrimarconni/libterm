@@ -50,24 +50,10 @@ int lt__plat_read_event(struct lt_event *ev, int timeout_ms) {
       if (rc != LT_OK)
         return rc;
 
-      if (new_w <= 0 || new_h <= 0)
-        continue;
-
-      if (new_w == lt__g.width && new_h == lt__g.height)
-        continue;
-
-      rc = lt__buffer_resize(new_w, new_h);
-      if (rc != LT_OK)
-        return rc;
-
-      lt__g.cur_x = -1;
-      lt__g.cur_y = -1;
-
-      memset(ev, 0, sizeof(struct lt_event));
-      ev->type = LT_EVENT_RESIZE;
-      ev->w = new_w;
-      ev->h = new_h;
-      return LT_OK;
+      rc = lt__handle_resize(new_w, new_h, ev);
+      if (rc == LT_ERR_NO_EVENT)
+        continue; /* spurious/unchanged: keep reading input records */
+      return rc;
     }
 
     if (rec.EventType == MOUSE_EVENT) {
