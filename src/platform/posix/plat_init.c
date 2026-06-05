@@ -78,6 +78,12 @@ int lt__plat_init_fd(int ttyfd, int owned) {
     goto fail_restore;
   }
 
+  /* Cursor hidden by default (termbox2 parity); lt_set_cursor shows it. */
+  if (lt__plat_hide_cursor() != LT_OK) {
+    rc = LT_ERR_INIT_OPEN;
+    goto fail_restore;
+  }
+
   if (lt__plat_flush() != LT_OK) {
     rc = LT_ERR_INIT_OPEN;
     goto fail_restore;

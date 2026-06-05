@@ -47,6 +47,13 @@ struct lt__state {
   int output_mode;
   int cur_x;
   int cur_y;
+  /* User cursor (lt_set_cursor / lt_hide_cursor): -1/-1 = hidden — the init
+   * default, termbox2 parity. Distinct from cur_x/cur_y above, which cache
+   * where the terminal's physical cursor sits after the last emission (the
+   * paint cache). When visible, lt_present reparks the physical cursor here
+   * after painting. */
+  int cursor_x;
+  int cursor_y;
   lt_attr cur_fg; /* SGR cache: last-emitted fg (color bits 0-23 + HI_BLACK) */
   lt_attr cur_bg; /* SGR cache: last-emitted bg (color bits 0-23 + HI_BLACK) */
   lt_attr cur_attrs; /* SGR cache: last-emitted attr bits (LT__ATTR_MASK) */

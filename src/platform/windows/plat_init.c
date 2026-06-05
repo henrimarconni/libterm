@@ -66,6 +66,14 @@ int lt__plat_init(void) {
     return LT_ERR_INIT_OPEN;
   }
 
+  /* Cursor hidden by default (termbox2 parity); lt_set_cursor shows it. */
+  rc = lt__plat_hide_cursor();
+  if (rc != LT_OK) {
+    (void)SetConsoleMode(lt__win_in, lt__win_in_mode_orig);
+    (void)SetConsoleMode(lt__win_out, lt__win_out_mode_orig);
+    return LT_ERR_INIT_OPEN;
+  }
+
   rc = lt__plat_flush();
   if (rc != LT_OK) {
     (void)SetConsoleMode(lt__win_in, lt__win_in_mode_orig);

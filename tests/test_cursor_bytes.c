@@ -70,8 +70,13 @@ int main(void) {
   assert(lt_present() == LT_OK);
   drain();
 
-  /* Positive: hide emits DECTCEM reset (?25l). The second present is a pure
-   * flush of the buffered escape (no dirty rows after the clear above). */
+  /* Positive: hide emits DECTCEM reset (?25l). Since the parity change the
+   * cursor starts hidden, so make it visible first (lt_set_cursor implies
+   * show) before asserting that hide re-emits ?25l. The second present is a
+   * pure flush of the buffered escape (no dirty rows after the clear above). */
+  assert(lt_set_cursor(0, 0) == LT_OK);
+  assert(lt_present() == LT_OK);
+  drain();
   assert(lt_hide_cursor() == LT_OK);
   assert(lt_present() == LT_OK);
   drain();
