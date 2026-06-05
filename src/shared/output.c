@@ -164,6 +164,23 @@ int lt_present(void) {
     lt__g.dirty_rows[y] = false;
   }
 
+  /* termbox2 parity: repark the physical cursor at the user cursor (when
+   * visible) so it survives the paint — clamped in case a resize shrank the
+   * viewport. Inside the sync bracket so the move lands atomically. */
+  if (lt__g.cursor_x >= 0) {
+    int ux = lt__g.cursor_x;
+    int uy = lt__g.cursor_y;
+    if (ux >= lt__g.width)
+      ux = lt__g.width - 1;
+    if (uy >= lt__g.height)
+      uy = lt__g.height - 1;
+    int mrc = lt__plat_move_cursor(ux, uy);
+    if (mrc != LT_OK)
+      return lt__present_abort(mrc);
+    lt__g.cur_x = ux;
+    lt__g.cur_y = uy;
+  }
+
   static const char sync_end[] = "\x1b[?2026l";
   (void)lt__plat_write(sync_end, sizeof(sync_end) - 1);
 
@@ -190,18 +207,49 @@ int lt_invalidate(void) {
 int lt_set_cursor(int x, int y) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
-  return lt__plat_move_cursor(x, y);
+
+  if (x < 0 || y < 0 || x >= lt__g.width || y >= lt__g.height)
+    return LT_ERR_OUT_OF_BOUNDS;
+
+  int rc;
+  /* termbox2 parity: setting the cursor implies visibility. */
+  if (lt__g.cursor_x < 0) {
+    rc = lt__plat_show_cursor();
+    if (rc != LT_OK)
+      return rc;
+  }
+  lt__g.cursor_x = x;
+  lt__g.cursor_y = y;
+
+  rc = lt__plat_move_cursor(x, y);
+  if (rc != LT_OK)
+    return rc;
+  lt__g.cur_x = x;
+  lt__g.cur_y = y;
+  return LT_OK;
 }
 
 int lt_hide_cursor(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
+  /* Idempotent: already hidden (the init default) emits nothing — mirrors
+   * tb_hide_cursor's cursor_x >= 0 guard. */
+  if (lt__g.cursor_x < 0)
+    return LT_OK;
+  lt__g.cursor_x = -1;
+  lt__g.cursor_y = -1;
   return lt__plat_hide_cursor();
 }
 
 int lt_show_cursor(void) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
+  /* libterm addition (termbox2 has no show API — visibility is implied by
+   * tb_set_cursor). Adopt the current physical position as the user cursor
+   * so state stays coherent: a following lt_hide_cursor really hides.
+   * Prefer lt_set_cursor for termbox2 semantics. */
+  lt__g.cursor_x = lt__g.cur_x >= 0 ? lt__g.cur_x : 0;
+  lt__g.cursor_y = lt__g.cur_y >= 0 ? lt__g.cur_y : 0;
   return lt__plat_show_cursor();
 }
 

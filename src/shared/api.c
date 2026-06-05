@@ -21,6 +21,8 @@ static int lt__finish_init(void) {
 
   lt__g.cur_x = -1;
   lt__g.cur_y = -1;
+  lt__g.cursor_x = -1; /* hidden by default (termbox2 parity) */
+  lt__g.cursor_y = -1;
   lt__g.cur_fg = 0xFFFFFFFF;
   lt__g.cur_bg = 0xFFFFFFFF;
   lt__g.cur_attrs = 0xFFFFFFFF;
