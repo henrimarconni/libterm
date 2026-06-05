@@ -1,0 +1,129 @@
+name: Release
+
+# Build prebuilt binaries for every published release and attach them (plus
+# SHA256SUMS) to it. workflow_dispatch backfills an existing tag (e.g. the
+# first run against v0.1.0). All x86_64 artifacts are fat runtime-dispatch
+# builds (LIBTERM_SIMD=auto): scalar+AVX2+AVX-512 selected at startup, so one
+# binary is fast on capable CPUs and safe on all of them.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build artifacts for (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.event.release.tag_name }}
+
+jobs:
+  # ----------------------------------------------------------------------
+  # The release tag must match the CMake project VERSION — catches the
+  # tag/version drift that had to be fixed by hand at v0.1.0.
+  # ----------------------------------------------------------------------
+  guard:
+    name: tag-version guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Tag matches CMake VERSION
+        run: |
+          tag="${TAG#v}"
+          ver=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\+\([0-9.]\+\).*/\1/p' CMakeLists.txt | head -1)
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::release tag ${TAG} (${tag}) != CMakeLists.txt VERSION (${ver})"
+            exit 1
+          fi
+          echo "tag ${TAG} matches CMake VERSION ${ver}"
+
+  # ----------------------------------------------------------------------
+  # Six artifact lanes. Native lanes re-run the test suite in Release mode
+  # (ci.yml gates Debug; Release-only miscompiles would otherwise ship).
+  # Cross lanes (riscv64, windows/MinGW) are build-only — the established
+  # verification standard; their backends are correctness-tested in ci.yml.
+  # macos-13 is the Intel runner (deprecation-tracked by GitHub; migration
+  # path is an OSX_ARCHITECTURES cross-build from arm64 when forced).
+  # ----------------------------------------------------------------------
+  build:
+    name: ${{ matrix.target }}
+    needs: guard
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { target: linux-x86_64,   os: ubuntu-latest,    method: native, toolchain: '', pkgs: '' }
+          - { target: linux-aarch64,  os: ubuntu-24.04-arm, method: native, toolchain: '', pkgs: '' }
+          - { target: linux-riscv64,  os: ubuntu-latest,    method: cross,  toolchain: cmake/toolchains/riscv64-qemu.cmake, pkgs: gcc-riscv64-linux-gnu }
+          - { target: windows-x86_64, os: ubuntu-latest,    method: cross,  toolchain: cmake/toolchains/mingw-w64.cmake,    pkgs: gcc-mingw-w64-x86-64 }
+          - { target: macos-arm64,    os: macos-latest,     method: native, toolchain: '', pkgs: '' }
+          - { target: macos-x86_64,   os: macos-13,         method: native, toolchain: '', pkgs: '' }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Install cross toolchain
+        if: matrix.pkgs != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.pkgs }}
+      - name: Configure (Release, runtime-dispatch SIMD)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            ${{ matrix.toolchain != '' && format('-DCMAKE_TOOLCHAIN_FILE={0}', matrix.toolchain) || '' }} \
+            -DLIBTERM_BUILD_TESTS=${{ matrix.method == 'native' && 'ON' || 'OFF' }} \
+            -DLIBTERM_BUILD_EXAMPLES=OFF \
+            -DLIBTERM_BUILD_BENCH=OFF
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test (Release mode)
+        if: matrix.method == 'native'
+        run: ctest --test-dir build --output-on-failure
+      - name: Stage install tree
+        run: cmake --install build --prefix "stage/libterm-${TAG}-${{ matrix.target }}"
+      - name: Archive
+        run: |
+          cd stage
+          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then
+            zip -r "../libterm-${TAG}-${{ matrix.target }}.zip" "libterm-${TAG}-${{ matrix.target }}"
+          else
+            tar -czf "../libterm-${TAG}-${{ matrix.target }}.tar.gz" "libterm-${TAG}-${{ matrix.target }}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libterm-${{ matrix.target }}
+          path: |
+            libterm-*.tar.gz
+            libterm-*.zip
+          if-no-files-found: error
+
+  # ----------------------------------------------------------------------
+  # Attach everything (plus one SHA256SUMS) to the release. --clobber makes
+  # re-runs idempotent. No checkout needed; gh targets the repo explicitly.
+  # ----------------------------------------------------------------------
+  publish:
+    name: attach to release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Generate SHA256SUMS
+        run: sha256sum libterm-* > SHA256SUMS && cat SHA256SUMS
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${TAG}" libterm-* SHA256SUMS --clobber --repo "${GITHUB_REPOSITORY}"

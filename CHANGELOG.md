@@ -7,6 +7,13 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Added
+- Prebuilt release binaries: every published GitHub release now automatically
+  gets install-tree archives for 6 targets (linux x86_64/aarch64/riscv64,
+  windows x86_64 MinGW, macos arm64/x86_64) plus a `SHA256SUMS` file, built in
+  Release mode with runtime-dispatched SIMD and gated by a tag-vs-CMake-version
+  guard (`.github/workflows/release.yml`).
+
 ### Changed
 - **Behavior change (termbox2 parity):** the terminal cursor is now **hidden
   by default** after `lt_init` — termbox2 has always done this, and visibility
