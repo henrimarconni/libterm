@@ -7,6 +7,15 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Changed
+- **Behavior change (termbox2 parity):** the terminal cursor is now **hidden
+  by default** after `lt_init` — termbox2 has always done this, and visibility
+  is now implied: `lt_set_cursor` shows the cursor (and `lt_present` keeps it
+  parked at the set position across frames); `lt_hide_cursor` hides it again.
+  Apps that relied on the old visible-by-default behavior must call
+  `lt_set_cursor` (or `lt_show_cursor`). Explicit `lt_hide_cursor()` calls
+  right after init are now redundant (and harmless).
+
 ### Fixed
 - Resize no longer leaves stale terminal content on screen: a size change now
   forces the next `lt_present` to repaint every cell (the terminal's
@@ -15,6 +24,8 @@ may contain breaking API changes; patch versions never do).
   shrinks). Both platform resize paths now share `lt__handle_resize`. Resize
   delivery semantics (exactly-once, burst coalescing, no-op suppression) are
   now validated end-to-end.
+- The terminal cursor no longer blinks at the end of the last painted row in
+  apps that never asked for a cursor (user-reported on `examples/resize`).
 
 ## [0.1.0] - 2026-06-05
 
