@@ -7,6 +7,14 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Added
+- Runtime SIMD dispatch: `LIBTERM_SIMD=auto` now compiles every backend the
+  target architecture supports and selects at startup from CPU capabilities
+  (x86_64: scalar→AVX2→AVX-512 via cpuid; aarch64: NEON→SVE via hwcap;
+  riscv64: scalar→RVV via hwcap) — one binary, fast on capable CPUs, no
+  illegal-instruction risk on older ones. Explicit `LIBTERM_SIMD=<backend>`
+  still builds a single static backend.
+
 ## [0.1.0] - 2026-06-05
 
 First release.
