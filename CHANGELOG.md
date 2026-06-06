@@ -43,6 +43,12 @@ may contain breaking API changes; patch versions never do).
 - `find_package(Libterm)` version compatibility is `SameMinorVersion` while
   pre-1.0 (matching this file's semver policy — pre-1.0 minors may break
   API); switches to `SameMajorVersion` automatically at 1.0.
+- **Artifact rename:** the libraries now follow Unix naming convention —
+  `libterm.a` / `libterm.so` / `libterm.dll` (was the double-prefixed
+  `liblibterm.*`), so the link flag is `-lterm`. CMake consumers
+  (`find_package`, `FetchContent`) are unaffected — imported targets carry
+  full paths. Anyone referencing the old filenames from a prebuilt v0.1.0
+  archive must update them at the next release.
 
 ### Fixed
 - Resize no longer leaves stale terminal content on screen: a size change now
