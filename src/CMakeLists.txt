@@ -226,32 +226,34 @@ elseif(LIBTERM_SIMD_FLAGS)
         COMPILE_OPTIONS "${LIBTERM_SIMD_FLAGS}")
 endif()
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/libterm
-    DESTINATION include
-    FILES_MATCHING PATTERN "*.h"
-)
+if(LIBTERM_INSTALL)
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/libterm
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h"
+    )
 
-# --- install: compiled libraries + CMake export ------------------------------
-# The package config (cmake/LibtermConfig.cmake.in) includes LibtermTargets.cmake,
-# generated here. EXPORT_NAME makes the installed names match the in-tree
-# aliases (Libterm::static / Libterm::shared); the umbrella Libterm::libterm is
-# recreated by the config file (ALIAS targets cannot be exported).
-set(LIBTERM_INSTALL_TARGETS "")
-if(TARGET libterm_static)
-    set_target_properties(libterm_static PROPERTIES EXPORT_NAME static)
-    list(APPEND LIBTERM_INSTALL_TARGETS libterm_static)
+    # --- install: compiled libraries + CMake export ------------------------------
+    # The package config (cmake/LibtermConfig.cmake.in) includes LibtermTargets.cmake,
+    # generated here. EXPORT_NAME makes the installed names match the in-tree
+    # aliases (Libterm::static / Libterm::shared); the umbrella Libterm::libterm is
+    # recreated by the config file (ALIAS targets cannot be exported).
+    set(LIBTERM_INSTALL_TARGETS "")
+    if(TARGET libterm_static)
+        set_target_properties(libterm_static PROPERTIES EXPORT_NAME static)
+        list(APPEND LIBTERM_INSTALL_TARGETS libterm_static)
+    endif()
+    if(TARGET libterm_shared)
+        set_target_properties(libterm_shared PROPERTIES EXPORT_NAME shared)
+        list(APPEND LIBTERM_INSTALL_TARGETS libterm_shared)
+    endif()
+    install(TARGETS ${LIBTERM_INSTALL_TARGETS}
+        EXPORT LibtermTargets
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+    install(EXPORT LibtermTargets
+        NAMESPACE Libterm::
+        DESTINATION lib/cmake/Libterm
+    )
 endif()
-if(TARGET libterm_shared)
-    set_target_properties(libterm_shared PROPERTIES EXPORT_NAME shared)
-    list(APPEND LIBTERM_INSTALL_TARGETS libterm_shared)
-endif()
-install(TARGETS ${LIBTERM_INSTALL_TARGETS}
-    EXPORT LibtermTargets
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
-install(EXPORT LibtermTargets
-    NAMESPACE Libterm::
-    DESTINATION lib/cmake/Libterm
-)
