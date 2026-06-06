@@ -18,6 +18,14 @@ may contain breaking API changes; patch versions never do).
   contract — build+link, no leaked example/test/bench targets, an
   uninstrumented library (also with `LIBTERM_BUILD_BENCH=ON`), and no
   install pollution (`tests/smoke_fetchcontent.sh`).
+- pkg-config support: `cmake --install` (and the release install-tree
+  archives, from the next release) ship `lib/pkgconfig/libterm.pc`. The
+  file is relocatable (`${pcfiledir}`-relative prefix), so it works wherever
+  a tarball is extracted. CI-guarded in `tests/smoke_install.sh`, including
+  a moved-prefix pass.
+- "Without CMake" README section: pkg-config consumption plus the manual
+  `cc`+`ar` scalar build, the latter CI-executed verbatim by
+  `tests/smoke_manual_build.sh` so the documentation cannot rot.
 
 ### Changed
 - **Behavior change (termbox2 parity):** the terminal cursor is now **hidden
@@ -43,6 +51,12 @@ may contain breaking API changes; patch versions never do).
 - `find_package(Libterm)` version compatibility is `SameMinorVersion` while
   pre-1.0 (matching this file's semver policy — pre-1.0 minors may break
   API); switches to `SameMajorVersion` automatically at 1.0.
+- **Artifact rename:** the libraries now follow Unix naming convention —
+  `libterm.a` / `libterm.so` / `libterm.dll` (was the double-prefixed
+  `liblibterm.*`), so the link flag is `-lterm`. CMake consumers
+  (`find_package`, `FetchContent`) are unaffected — imported targets carry
+  full paths. Anyone referencing the old filenames from a prebuilt v0.1.0
+  archive must update them at the next release.
 
 ### Fixed
 - Resize no longer leaves stale terminal content on screen: a size change now

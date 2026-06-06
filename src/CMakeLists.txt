@@ -161,7 +161,7 @@ set(LIBTERM_PUBLIC_INCLUDES
 if(LIBTERM_BUILD_STATIC)
     add_library(libterm_static STATIC ${LIBTERM_ALL_SOURCES})
     set_target_properties(libterm_static PROPERTIES
-        OUTPUT_NAME libterm
+        OUTPUT_NAME term
         C_VISIBILITY_PRESET hidden
     )
     target_compile_definitions(libterm_static PRIVATE LIBTERM_BUILDING)
@@ -177,7 +177,7 @@ endif()
 if(LIBTERM_BUILD_SHARED)
     add_library(libterm_shared SHARED ${LIBTERM_ALL_SOURCES})
     set_target_properties(libterm_shared PROPERTIES
-        OUTPUT_NAME libterm
+        OUTPUT_NAME term
         C_VISIBILITY_PRESET hidden
         VERSION   ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}

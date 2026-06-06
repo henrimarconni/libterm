@@ -63,4 +63,11 @@ if(LIBTERM_INSTALL)
         ${CMAKE_CURRENT_BINARY_DIR}/LibtermConfigVersion.cmake
         DESTINATION lib/cmake/Libterm
     )
+    # pkg-config (Meson / Autotools / Makefile consumers). The
+    # ${pcfiledir}-relative prefix keeps the file working inside relocated
+    # install-tree tarballs — same property the CMake package config has.
+    configure_file(cmake/libterm.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/libterm.pc @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libterm.pc
+        DESTINATION lib/pkgconfig)
 endif()

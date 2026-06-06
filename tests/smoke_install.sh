@@ -48,3 +48,28 @@ EOF
 
 smoke_pass default
 smoke_pass shared-only -DLIBTERM_BUILD_STATIC=OFF
+
+# --- pkg-config consumer (against the default stage's installed prefix) ----
+pcdir="$work/default/prefix/lib/pkgconfig"
+flags=$(PKG_CONFIG_PATH="$pcdir" pkg-config --cflags --libs libterm)
+case "$flags" in
+    *-lterm*) ;;
+    *) echo "FAIL: pkg-config flags missing -lterm: $flags"; exit 1 ;;
+esac
+# $flags intentionally unquoted below: the flag string must word-split.
+# The prefix holds both libterm.a and libterm.so*, so -lterm links the
+# shared lib; the temp prefix is not on the loader path, hence
+# LD_LIBRARY_PATH on the run lines (harmless if the static lib is picked).
+cc "$work/default/consumer/main.c" $flags -o "$work/pc-consumer"
+LD_LIBRARY_PATH="$work/default/prefix/lib" "$work/pc-consumer"
+echo "PASS [pkg-config]: consumer built and ran from pkg-config flags"
+
+# Relocatability: the ${pcfiledir}-relative prefix must keep working after
+# the install tree moves (this is how the release tarballs are consumed).
+# cp -a preserves the libterm.so symlink chain, like a real tar extraction.
+cp -a "$work/default/prefix" "$work/moved-prefix"
+flags=$(PKG_CONFIG_PATH="$work/moved-prefix/lib/pkgconfig" \
+    pkg-config --cflags --libs libterm)
+cc "$work/default/consumer/main.c" $flags -o "$work/pc-consumer-moved"
+LD_LIBRARY_PATH="$work/moved-prefix/lib" "$work/pc-consumer-moved"
+echo "PASS [pkg-config-reloc]: consumer built and ran from relocated prefix"
