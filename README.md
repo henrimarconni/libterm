@@ -87,6 +87,31 @@ target_link_libraries(myapp PRIVATE Libterm::libterm)
 
 `Libterm::libterm` resolves to the static library by default; `Libterm::static` and `Libterm::shared` are also available. The public header is `include/libterm/libterm.h`.
 
+### Without CMake
+
+Installed trees (a [release](https://github.com/rizukirr/libterm/releases)
+tarball or `cmake --install`) ship a pkg-config file:
+
+```sh
+export PKG_CONFIG_PATH=/path/to/prefix/lib/pkgconfig  # only if not a system prefix
+cc app.c $(pkg-config --cflags --libs libterm)
+```
+
+No build system at all? libterm is plain C11 with no dependencies — the
+scalar build is one compiler invocation (CI runs exactly these lines:
+`tests/smoke_manual_build.sh`):
+
+```sh
+cc -std=c11 -c src/shared/*.c src/platform/posix/*.c src/intrinsics/scalar.c \
+    -Iinclude -Isrc
+ar rcs libterm.a *.o
+```
+
+On Windows, swap `src/platform/posix/*.c` for `src/platform/windows/*.c`.
+No defines are needed (`LT_API` expands to nothing in static builds).
+Runtime-dispatched SIMD is a CMake-build feature — manual builds get the
+scalar backend.
+
 ## Examples
 
 Built into `build/examples/`:
