@@ -165,6 +165,33 @@ jobs:
         run: bash tests/smoke_install.sh .
 
   # --------------------------------------------------------------------------
+  # Subproject wiring: FetchContent consumer against the working tree, on all
+  # three OSes. Asserts build+link, no leaked example/test/bench targets, an
+  # uninstrumented library (also with LIBTERM_BUILD_BENCH=ON — the
+  # instrumented copy must be libterm_bench), and no install pollution.
+  # Windows uses the runner-preinstalled MinGW GCC via CC=gcc, same as
+  # windows-mingw-native; the script forces the Ninja generator everywhere.
+  # --------------------------------------------------------------------------
+  fetchcontent-smoke:
+    name: fetchcontent-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Smoke-test FetchContent consumer
+        shell: bash
+        run: bash tests/smoke_fetchcontent.sh .
+
+  # --------------------------------------------------------------------------
   # AddressSanitizer + UndefinedBehaviorSanitizer on the full test suite.
   # --------------------------------------------------------------------------
   sanitizers:

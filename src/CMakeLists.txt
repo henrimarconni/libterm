@@ -153,7 +153,7 @@ set(LIBTERM_PRIVATE_INCLUDES
 )
 
 set(LIBTERM_PUBLIC_INCLUDES
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -201,6 +201,39 @@ elseif(LIBTERM_BUILD_SHARED)
     add_library(Libterm::libterm ALIAS libterm_shared)
 endif()
 
+# --- bench: instrumented copy ------------------------------------------------
+# bench/ links this copy instead of mutating libterm_static, so the shipped
+# library is always clean (render stats + fixed grid dims are bench-only).
+# Lives here (not bench/) because the per-backend SIMD source properties
+# below are directory-scoped and must apply to this target's TUs too.
+if(LIBTERM_BUILD_BENCH)
+    set(LIBTERM_BENCH_WIDTH 40 CACHE STRING "bench grid width")
+    set(LIBTERM_BENCH_HEIGHT 12 CACHE STRING "bench grid height")
+    option(LIBTERM_BENCH_HEADLESS
+        "Make the bench library copy no-op all tty writes (for bench measurement)"
+        OFF)
+
+    add_library(libterm_bench STATIC ${LIBTERM_ALL_SOURCES})
+    set_target_properties(libterm_bench PROPERTIES
+        C_VISIBILITY_PRESET hidden
+    )
+    target_compile_definitions(libterm_bench PRIVATE
+        LIBTERM_BUILDING
+        LIBTERM_ENABLE_RENDER_STATS
+        LIBTERM_BENCH_WIDTH=${LIBTERM_BENCH_WIDTH}
+        LIBTERM_BENCH_HEIGHT=${LIBTERM_BENCH_HEIGHT}
+    )
+    if(LIBTERM_BENCH_HEADLESS)
+        target_compile_definitions(libterm_bench PRIVATE
+            LIBTERM_BENCH_HEADLESS_OUTPUT)
+    endif()
+    target_include_directories(libterm_bench
+        PUBLIC  ${LIBTERM_PUBLIC_INCLUDES}
+        PRIVATE ${LIBTERM_PRIVATE_INCLUDES}
+    )
+    libterm_set_warnings(libterm_bench)
+endif()
+
 # Apply per-TU compile flags (and, in dispatch mode, the per-backend symbol
 # renames + the backend-presence defines for dispatch.c).
 if(LIBTERM_SIMD_RESOLVED STREQUAL "dispatch")
@@ -226,32 +259,34 @@ elseif(LIBTERM_SIMD_FLAGS)
         COMPILE_OPTIONS "${LIBTERM_SIMD_FLAGS}")
 endif()
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/libterm
-    DESTINATION include
-    FILES_MATCHING PATTERN "*.h"
-)
+if(LIBTERM_INSTALL)
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/libterm
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h"
+    )
 
-# --- install: compiled libraries + CMake export ------------------------------
-# The package config (cmake/LibtermConfig.cmake.in) includes LibtermTargets.cmake,
-# generated here. EXPORT_NAME makes the installed names match the in-tree
-# aliases (Libterm::static / Libterm::shared); the umbrella Libterm::libterm is
-# recreated by the config file (ALIAS targets cannot be exported).
-set(LIBTERM_INSTALL_TARGETS "")
-if(TARGET libterm_static)
-    set_target_properties(libterm_static PROPERTIES EXPORT_NAME static)
-    list(APPEND LIBTERM_INSTALL_TARGETS libterm_static)
+    # --- install: compiled libraries + CMake export ------------------------------
+    # The package config (cmake/LibtermConfig.cmake.in) includes LibtermTargets.cmake,
+    # generated here. EXPORT_NAME makes the installed names match the in-tree
+    # aliases (Libterm::static / Libterm::shared); the umbrella Libterm::libterm is
+    # recreated by the config file (ALIAS targets cannot be exported).
+    set(LIBTERM_INSTALL_TARGETS "")
+    if(TARGET libterm_static)
+        set_target_properties(libterm_static PROPERTIES EXPORT_NAME static)
+        list(APPEND LIBTERM_INSTALL_TARGETS libterm_static)
+    endif()
+    if(TARGET libterm_shared)
+        set_target_properties(libterm_shared PROPERTIES EXPORT_NAME shared)
+        list(APPEND LIBTERM_INSTALL_TARGETS libterm_shared)
+    endif()
+    install(TARGETS ${LIBTERM_INSTALL_TARGETS}
+        EXPORT LibtermTargets
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+    install(EXPORT LibtermTargets
+        NAMESPACE Libterm::
+        DESTINATION lib/cmake/Libterm
+    )
 endif()
-if(TARGET libterm_shared)
-    set_target_properties(libterm_shared PROPERTIES EXPORT_NAME shared)
-    list(APPEND LIBTERM_INSTALL_TARGETS libterm_shared)
-endif()
-install(TARGETS ${LIBTERM_INSTALL_TARGETS}
-    EXPORT LibtermTargets
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
-install(EXPORT LibtermTargets
-    NAMESPACE Libterm::
-    DESTINATION lib/cmake/Libterm
-)
