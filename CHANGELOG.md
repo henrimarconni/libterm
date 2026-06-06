@@ -7,78 +7,46 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-06
+
+First release. (Re-tagged 2026-06-06 to fold in the packaging and
+consumption work that landed immediately after the original 2026-06-05 tag;
+the prebuilt archives were rebuilt from the re-tagged commit.)
+
 ### Added
-- Prebuilt release binaries: every published GitHub release now automatically
+- Prebuilt release binaries: every published GitHub release automatically
   gets install-tree archives for 6 targets (linux x86_64/aarch64/riscv64,
   windows x86_64 MinGW, macos arm64/x86_64) plus a `SHA256SUMS` file, built in
   Release mode with runtime-dispatched SIMD and gated by a tag-vs-CMake-version
   guard (`.github/workflows/release.yml`).
-- CI `fetchcontent-smoke` job (ubuntu / windows / macos): builds a minimal
-  `FetchContent` consumer against the tree and asserts the subproject
-  contract — build+link, no leaked example/test/bench targets, an
-  uninstrumented library (also with `LIBTERM_BUILD_BENCH=ON`), and no
-  install pollution (`tests/smoke_fetchcontent.sh`).
-- pkg-config support: `cmake --install` (and the release install-tree
-  archives, from the next release) ship `lib/pkgconfig/libterm.pc`. The
-  file is relocatable (`${pcfiledir}`-relative prefix), so it works wherever
-  a tarball is extracted. CI-guarded in `tests/smoke_install.sh`, including
-  a moved-prefix pass.
+- Consumable as a subproject: `FetchContent` / `add_subdirectory` builds get
+  exactly one target (the static library) — `LIBTERM_BUILD_SHARED`,
+  `LIBTERM_BUILD_EXAMPLES`, `LIBTERM_BUILD_BENCH`, `LIBTERM_BUILD_TESTS`, and
+  `LIBTERM_INSTALL` default to ON only when libterm is the top-level project,
+  and everything stays opt-in. Guarded by the CI `fetchcontent-smoke` job
+  (ubuntu / windows / macos): build+link, no leaked targets, an
+  uninstrumented library (also with `LIBTERM_BUILD_BENCH=ON`), no install
+  pollution (`tests/smoke_fetchcontent.sh`).
+- pkg-config support: installed trees ship `lib/pkgconfig/libterm.pc`,
+  relocatable (`${pcfiledir}`-relative prefix) so it works wherever a release
+  tarball is extracted. CI-guarded in `tests/smoke_install.sh`, including a
+  moved-prefix pass. Artifacts follow Unix naming convention — `libterm.a` /
+  `libterm.so` / `libterm.dll`, link flag `-lterm`. `find_package(Libterm)`
+  version compatibility is `SameMinorVersion` while pre-1.0 (switches to
+  `SameMajorVersion` automatically at 1.0).
 - "Without CMake" README section: pkg-config consumption plus the manual
   `cc`+`ar` scalar build, the latter CI-executed verbatim by
   `tests/smoke_manual_build.sh` so the documentation cannot rot.
-
-### Changed
-- **Behavior change (termbox2 parity):** the terminal cursor is now **hidden
-  by default** after `lt_init` — termbox2 has always done this, and visibility
-  is now implied: `lt_set_cursor` shows the cursor (and `lt_present` keeps it
-  parked at the set position across frames); `lt_hide_cursor` hides it again.
-  Apps that relied on the old visible-by-default behavior must call
-  `lt_set_cursor` (or `lt_show_cursor`). Explicit `lt_hide_cursor()` calls
-  right after init are now redundant (and harmless).
-- Subproject builds are clean by default: `LIBTERM_BUILD_SHARED`,
-  `LIBTERM_BUILD_EXAMPLES`, `LIBTERM_BUILD_BENCH`, `LIBTERM_BUILD_TESTS`, and
-  the new `LIBTERM_INSTALL` default to ON only when libterm is the top-level
-  project. A `FetchContent` / `add_subdirectory` consumer gets exactly one
-  target (the static library) and no install rules; everything stays opt-in.
-  Top-level builds are unchanged.
-- Bench instrumentation no longer leaks into the shipped library: benches
-  link a dedicated `libterm_bench` copy carrying `LIBTERM_ENABLE_RENDER_STATS`
-  and the grid dims; `libterm_static` / `libterm_shared` are always clean
-  (previously a default build's library was compiled with render stats
-  because `bench/` mutated `libterm_static` whenever `LIBTERM_BUILD_BENCH`
-  was ON — its default). `LIBTERM_BENCH_HEADLESS` now affects only the bench
-  copy, so it no longer breaks examples/tests.
-- `find_package(Libterm)` version compatibility is `SameMinorVersion` while
-  pre-1.0 (matching this file's semver policy — pre-1.0 minors may break
-  API); switches to `SameMajorVersion` automatically at 1.0.
-- **Artifact rename:** the libraries now follow Unix naming convention —
-  `libterm.a` / `libterm.so` / `libterm.dll` (was the double-prefixed
-  `liblibterm.*`), so the link flag is `-lterm`. CMake consumers
-  (`find_package`, `FetchContent`) are unaffected — imported targets carry
-  full paths. Anyone referencing the old filenames from a prebuilt v0.1.0
-  archive must update them at the next release.
-
-### Fixed
-- Resize no longer leaves stale terminal content on screen: a size change now
-  forces the next `lt_present` to repaint every cell (the terminal's
-  scrolled/reflowed content no longer matches libterm's blanked buffers, so
-  the diff previously skipped blank-equal cells — most visible after height
-  shrinks). Both platform resize paths now share `lt__handle_resize`. Resize
-  delivery semantics (exactly-once, burst coalescing, no-op suppression) are
-  now validated end-to-end.
-- The terminal cursor no longer blinks at the end of the last painted row in
-  apps that never asked for a cursor (user-reported on `examples/resize`).
-- `FetchContent` / `add_subdirectory` consumption was broken: the include
-  interface and header install rule used `CMAKE_SOURCE_DIR`, which is the
-  *consumer's* root in subproject builds, so libterm's own TUs failed with
-  `libterm/libterm.h: No such file or directory`. Both now use
-  `PROJECT_SOURCE_DIR` (same fix applied throughout `tests/CMakeLists.txt`).
-
-## [0.1.0] - 2026-06-05
-
-First release.
-
-### Added
+- termbox2 cursor parity: the terminal cursor is hidden by default after
+  `lt_init`; `lt_set_cursor` shows it (and `lt_present` keeps it parked at
+  the set position across frames), `lt_hide_cursor` hides it again.
+- Resize correctness end-to-end: a size change forces the next `lt_present`
+  to repaint every cell (no stale terminal content after shrinks); both
+  platform resize paths share `lt__handle_resize`, with exactly-once
+  delivery, burst coalescing, and no-op suppression validated by tests.
+- Bench instrumentation is isolated: benches link a dedicated
+  `libterm_bench` copy carrying `LIBTERM_ENABLE_RENDER_STATS`; the shipped
+  `libterm_static` / `libterm_shared` are always clean.
 - termbox2-compatible API (`lt_`/`LT_` prefix) on POSIX and native Win32
   Console; three documented intentional divergences.
 - Double-buffered diff renderer with SIMD cell scans (AVX2/AVX-512/NEON/SVE/
