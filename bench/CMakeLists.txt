@@ -1,26 +1,6 @@
-set(LIBTERM_BENCH_LINK_TARGET libterm_static)
-if(NOT LIBTERM_BUILD_STATIC)
-    set(LIBTERM_BENCH_LINK_TARGET libterm_shared)
-endif()
-
-option(LIBTERM_BENCH_HEADLESS
-    "Make libterm_static no-op all tty writes (for bench measurement; breaks examples/tests)"
-    OFF)
-
-set(LIBTERM_BENCH_WIDTH 40 CACHE STRING "bench grid width")
-set(LIBTERM_BENCH_HEIGHT 12 CACHE STRING "bench grid height")
-
-if(LIBTERM_BUILD_STATIC)
-    target_compile_definitions(libterm_static PRIVATE
-        LIBTERM_ENABLE_RENDER_STATS
-        LIBTERM_BENCH_WIDTH=${LIBTERM_BENCH_WIDTH}
-        LIBTERM_BENCH_HEIGHT=${LIBTERM_BENCH_HEIGHT})
-    if(LIBTERM_BENCH_HEADLESS)
-        target_compile_definitions(libterm_static PRIVATE
-            LIBTERM_BENCH_HEADLESS_OUTPUT)
-    endif()
-endif()
-
+# Bench executables link libterm_bench — the instrumented copy built in src/
+# (render stats + grid dims; see the libterm_bench block there). The real
+# libterm_static / libterm_shared never carry bench defines.
 function(libterm_add_bench name)
     add_executable(${name} ${name}.c)
     target_compile_definitions(${name} PRIVATE
@@ -28,7 +8,7 @@ function(libterm_add_bench name)
         LIBTERM_BENCH_WIDTH=${LIBTERM_BENCH_WIDTH}
         LIBTERM_BENCH_HEIGHT=${LIBTERM_BENCH_HEIGHT})
     target_include_directories(${name} PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_link_libraries(${name} PRIVATE ${LIBTERM_BENCH_LINK_TARGET})
+    target_link_libraries(${name} PRIVATE libterm_bench)
 endfunction()
 
 libterm_add_bench(bench_present)
