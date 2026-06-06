@@ -71,12 +71,19 @@ int main(void) {
 
 ## Use it in your project
 
-With CMake, add libterm as a subdirectory (or `FetchContent`) and link the exported target:
+With CMake, fetch libterm directly and link the exported target:
 
 ```cmake
-add_subdirectory(libterm)
+include(FetchContent)
+FetchContent_Declare(libterm
+    GIT_REPOSITORY https://github.com/rizukirr/libterm
+    GIT_TAG        v0.1.0)
+FetchContent_MakeAvailable(libterm)
+
 target_link_libraries(myapp PRIVATE Libterm::libterm)
 ```
+
+(or `add_subdirectory(libterm)` on a vendored checkout). In subproject builds libterm builds only the static library — examples, benchmarks, tests, the shared library, and install rules are all skipped automatically; each is opt-in via its `LIBTERM_*` option (`cmake -LH` lists them).
 
 `Libterm::libterm` resolves to the static library by default; `Libterm::static` and `Libterm::shared` are also available. The public header is `include/libterm/libterm.h`.
 

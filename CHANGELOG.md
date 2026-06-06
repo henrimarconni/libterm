@@ -13,6 +13,11 @@ may contain breaking API changes; patch versions never do).
   windows x86_64 MinGW, macos arm64/x86_64) plus a `SHA256SUMS` file, built in
   Release mode with runtime-dispatched SIMD and gated by a tag-vs-CMake-version
   guard (`.github/workflows/release.yml`).
+- CI `fetchcontent-smoke` job (ubuntu / windows / macos): builds a minimal
+  `FetchContent` consumer against the tree and asserts the subproject
+  contract — build+link, no leaked example/test/bench targets, an
+  uninstrumented library (also with `LIBTERM_BUILD_BENCH=ON`), and no
+  install pollution (`tests/smoke_fetchcontent.sh`).
 
 ### Changed
 - **Behavior change (termbox2 parity):** the terminal cursor is now **hidden
@@ -22,6 +27,22 @@ may contain breaking API changes; patch versions never do).
   Apps that relied on the old visible-by-default behavior must call
   `lt_set_cursor` (or `lt_show_cursor`). Explicit `lt_hide_cursor()` calls
   right after init are now redundant (and harmless).
+- Subproject builds are clean by default: `LIBTERM_BUILD_SHARED`,
+  `LIBTERM_BUILD_EXAMPLES`, `LIBTERM_BUILD_BENCH`, `LIBTERM_BUILD_TESTS`, and
+  the new `LIBTERM_INSTALL` default to ON only when libterm is the top-level
+  project. A `FetchContent` / `add_subdirectory` consumer gets exactly one
+  target (the static library) and no install rules; everything stays opt-in.
+  Top-level builds are unchanged.
+- Bench instrumentation no longer leaks into the shipped library: benches
+  link a dedicated `libterm_bench` copy carrying `LIBTERM_ENABLE_RENDER_STATS`
+  and the grid dims; `libterm_static` / `libterm_shared` are always clean
+  (previously a default build's library was compiled with render stats
+  because `bench/` mutated `libterm_static` whenever `LIBTERM_BUILD_BENCH`
+  was ON — its default). `LIBTERM_BENCH_HEADLESS` now affects only the bench
+  copy, so it no longer breaks examples/tests.
+- `find_package(Libterm)` version compatibility is `SameMinorVersion` while
+  pre-1.0 (matching this file's semver policy — pre-1.0 minors may break
+  API); switches to `SameMajorVersion` automatically at 1.0.
 
 ### Fixed
 - Resize no longer leaves stale terminal content on screen: a size change now
@@ -33,6 +54,11 @@ may contain breaking API changes; patch versions never do).
   now validated end-to-end.
 - The terminal cursor no longer blinks at the end of the last painted row in
   apps that never asked for a cursor (user-reported on `examples/resize`).
+- `FetchContent` / `add_subdirectory` consumption was broken: the include
+  interface and header install rule used `CMAKE_SOURCE_DIR`, which is the
+  *consumer's* root in subproject builds, so libterm's own TUs failed with
+  `libterm/libterm.h: No such file or directory`. Both now use
+  `PROJECT_SOURCE_DIR` (same fix applied throughout `tests/CMakeLists.txt`).
 
 ## [0.1.0] - 2026-06-05
 
