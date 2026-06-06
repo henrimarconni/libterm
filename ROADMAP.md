@@ -292,6 +292,36 @@ Modifiers are reported today *only* on CSI-encoded keys (arrows, F-keys, nav): `
 
 ---
 
+## Release & distribution
+
+Consumption channels, tracked like the API tables above: a channel counts as
+`[x]` only when it works end-to-end *and* CI guards it.
+
+| Channel | Status | Notes |
+|---|---|---|
+| `find_package(Libterm)` (installed tree) | [x] | install/export smoke-tested in default + shared-only configurations (`tests/smoke_install.sh`) |
+| `FetchContent` / `add_subdirectory` | [x] | clean by default — one static-lib target, everything else top-level-only opt-in; guarded by `fetchcontent-smoke` on ubuntu/windows/macos |
+| pkg-config (`lib/pkgconfig/libterm.pc`) | [x] | relocatable (`${pcfiledir}`-relative prefix, survives tarball moves); CI-guarded incl. a moved-prefix pass |
+| Manual build (no build system) | [x] | README "Without CMake" `cc`+`ar` scalar recipe; CI executes it verbatim (`tests/smoke_manual_build.sh`) |
+| Prebuilt archives | [x] | 6 targets (linux x86_64/aarch64/riscv64, windows x86_64 MinGW, macos arm64/x86_64) + `SHA256SUMS` per release; tag-vs-CMake-version guard; rebuildable per tag via `workflow_dispatch` |
+| vcpkg | [ ] | next channel — name is free in the registry (checked 2026-06-06); overlay-port vs direct microsoft/vcpkg submission undecided; v0.1.0 is the reference tag |
+| AUR | [ ] | a PKGBUILD; audience overlaps heavily with terminal tooling |
+| Fedora COPR | [ ] | self-service personal repo — fine pre-1.0, unlike official Fedora |
+| Ubuntu PPA (Launchpad) | [ ] | self-service personal repo — fine pre-1.0, unlike official Debian/Ubuntu |
+| Homebrew | [ ] | personal tap first (builds from source — sidesteps the unsigned-binary caveat); homebrew-core has notability thresholds, revisit at 1.0 |
+| Official distro repos (Debian / Fedora / homebrew-core) | [—] | deliberately deferred until 1.0 — they want API/ABI stability and pre-1.0 minors may break API |
+| winget | [—] | wrong channel by design — winget distributes end-user applications, not development libraries |
+
+**Open questions.**
+- macOS binary signing/notarization: currently unsigned with the documented
+  `xattr` workaround; revisit if macOS adoption grows (a tap or source builds
+  make it moot).
+- Single-file amalgamation (scalar-only `libterm.c`/`.h`): the strongest
+  from-source story in this niche (termbox2 is single-header), but nontrivial
+  against the platform split and TU-local statics — deferred, unscheduled.
+
+---
+
 ## Out of scope for libterm (intentional divergence from termbox2)
 
 - Header-only distribution. libterm ships as a compiled library by design; `compat/termbox2.h` (planned) will provide the drop-in macro layer.
