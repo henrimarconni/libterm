@@ -310,7 +310,6 @@ Consumption channels, tracked like the API tables above: a channel counts as
 | Ubuntu PPA (Launchpad) | [ ] | self-service personal repo — fine pre-1.0, unlike official Debian/Ubuntu |
 | Homebrew | [ ] | personal tap first (builds from source — sidesteps the unsigned-binary caveat); homebrew-core has notability thresholds, revisit at 1.0 |
 | Official distro repos (Debian / Fedora / homebrew-core) | [—] | deliberately deferred until 1.0 — they want API/ABI stability and pre-1.0 minors may break API |
-| winget | [—] | wrong channel by design — winget distributes end-user applications, not development libraries |
 
 **Open questions.**
 - macOS binary signing/notarization: currently unsigned with the documented
