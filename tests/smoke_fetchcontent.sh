@@ -6,10 +6,12 @@
 # (tests/fixtures/fetchcontent-consumer) against the working tree and assert
 # the subproject contract:
 #   1. the consumer configures, builds, and links Libterm::libterm;
-#   2. no example/test/bench/shared-lib targets leak into the consumer build;
+#   2. the consumer build compiles ONLY consumer + libterm_static targets
+#      (whitelist — any other target, present or future, is a leak);
 #   3. the consumed library is uninstrumented (no bench defines) — also when
-#      the consumer opts into LIBTERM_BUILD_BENCH=ON (the instrumented copy
-#      must be libterm_bench, never libterm_static);
+#      the consumer opts into LIBTERM_BUILD_BENCH=ON + LIBTERM_BUILD_SHARED=ON
+#      (the instrumented copy must be libterm_bench, never
+#      libterm_static/libterm_shared);
 #   4. `cmake --install` of the consumer installs nothing of libterm's.
 #
 # Uses the Ninja generator: present on all CI runners this repo uses, and it
@@ -35,12 +37,24 @@ cmake --build "$build" --parallel >/dev/null
 echo "PASS: consumer configured, built, and linked"
 
 cc_json="$build/compile_commands.json"
-for leak in hello.c test_utf8.c bench_present.c 'libterm_shared\.dir'; do
-    if grep -q "$leak" "$cc_json"; then
-        fail "leaked into consumer build: $leak"
-    fi
-done
-echo "PASS: no example/test/bench/shared targets in the consumer build"
+# Whitelist, not blacklist: every compiled TU lands under a <target>.dir/
+# output path; the only legitimate targets in a default consumer build are
+# the consumer exe and the libterm static lib. Anything else — examples,
+# tests, benches, shared lib, or targets that don't exist yet — is a leak.
+dirs=$(grep -o '[A-Za-z0-9_.-]*\.dir' "$cc_json" | sort -u)
+# presence control: extraction must see both whitelisted targets, or the
+# leak check below proves nothing
+echo "$dirs" | grep -q '^consumer\.dir$' \
+    || fail "presence control broken: consumer.dir not extracted"
+echo "$dirs" | grep -q '^libterm_static\.dir$' \
+    || fail "presence control broken: libterm_static.dir not extracted"
+leaked=$(echo "$dirs" \
+    | grep -v -e '^consumer\.dir$' -e '^libterm_static\.dir$' || true)
+if [ -n "$leaked" ]; then
+    echo "$leaked"
+    fail "leaked targets in consumer build"
+fi
+echo "PASS: consumer build compiles only consumer + libterm_static"
 
 if grep -q 'LIBTERM_ENABLE_RENDER_STATS\|LIBTERM_BENCH_' "$cc_json"; then
     fail "instrumented library: bench defines in consumer compile commands"
@@ -55,17 +69,24 @@ if [ -n "$polluted" ]; then
 fi
 echo "PASS: no libterm install pollution"
 
-# --- pass 2: consumer opts into bench — library copy must stay clean -------
+# --- pass 2: consumer opts into bench+shared — real libs must stay clean ---
 build2="$work/build-bench"
 cmake -S "$src/tests/fixtures/fetchcontent-consumer" -B "$build2" -G Ninja \
     -DLIBTERM_SOURCE_DIR="$src" \
     -DLIBTERM_BUILD_BENCH=ON \
+    -DLIBTERM_BUILD_SHARED=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
 cc_json2="$build2/compile_commands.json"
-if grep 'libterm_static\.dir' "$cc_json2" \
-        | grep -q 'LIBTERM_ENABLE_RENDER_STATS'; then
-    fail "libterm_static instrumented even though bench has its own copy"
-fi
+for lib in libterm_static libterm_shared; do
+    if grep "${lib}\.dir" "$cc_json2" \
+            | grep -q 'LIBTERM_ENABLE_RENDER_STATS'; then
+        fail "$lib instrumented even though bench has its own copy"
+    fi
+    # presence control: the lib's TUs must exist in this pass, or the
+    # cleanliness grep above proved nothing
+    grep -q "${lib}\.dir" "$cc_json2" \
+        || fail "presence control broken: no ${lib} TUs in pass 2"
+done
 # positive control: the same mechanism must see the defines on the bench copy
 grep 'libterm_bench\.dir' "$cc_json2" \
         | grep -q 'LIBTERM_ENABLE_RENDER_STATS' \
