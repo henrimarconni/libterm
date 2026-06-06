@@ -163,6 +163,8 @@ jobs:
           cmake-version: 'latest'
       - name: Smoke-test install + find_package
         run: bash tests/smoke_install.sh .
+      - name: Smoke-test manual (no-CMake) build
+        run: bash tests/smoke_manual_build.sh .
 
   # --------------------------------------------------------------------------
   # Subproject wiring: FetchContent consumer against the working tree, on all

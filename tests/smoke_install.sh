@@ -48,3 +48,23 @@ EOF
 
 smoke_pass default
 smoke_pass shared-only -DLIBTERM_BUILD_STATIC=OFF
+
+# --- pkg-config consumer (against the default stage's installed prefix) ----
+pcdir="$work/default/prefix/lib/pkgconfig"
+flags=$(PKG_CONFIG_PATH="$pcdir" pkg-config --cflags --libs libterm)
+case "$flags" in
+    *-lterm*) ;;
+    *) echo "FAIL: pkg-config flags missing -lterm: $flags"; exit 1 ;;
+esac
+cc "$work/default/consumer/main.c" $flags -o "$work/pc-consumer"
+"$work/pc-consumer"
+echo "PASS [pkg-config]: consumer built and ran from pkg-config flags"
+
+# Relocatability: the ${pcfiledir}-relative prefix must keep working after
+# the install tree moves (this is how the release tarballs are consumed).
+cp -r "$work/default/prefix" "$work/moved-prefix"
+flags=$(PKG_CONFIG_PATH="$work/moved-prefix/lib/pkgconfig" \
+    pkg-config --cflags --libs libterm)
+cc "$work/default/consumer/main.c" $flags -o "$work/pc-consumer-moved"
+"$work/pc-consumer-moved"
+echo "PASS [pkg-config-reloc]: consumer built and ran from relocated prefix"
