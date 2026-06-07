@@ -1,11 +1,11 @@
-#define ARENA_IMPLEMENTATION
+#define LT_ARENA_IMPLEMENTATION
 #include "internal.h"
 #include "intrinsics/diff.h"
 #include "lib/arena.h"
 #include <stdlib.h>
 #include <string.h>
 
-#define ARENA_BYTES_INIT 4096
+#define LT_ARENA_BYTES_INIT 4096
 
 int lt__buffer_resize(int w, int h) {
   if (w <= 0 || h <= 0)
@@ -23,18 +23,18 @@ int lt__buffer_resize(int w, int h) {
   const size_t cells_bytes = n * sizeof(struct lt_cell);
   if (!lt__g.arena) {
     size_t arena_bytes = cells_bytes * 2;
-    if (arena_bytes < ARENA_BYTES_INIT)
-      arena_bytes = ARENA_BYTES_INIT;
+    if (arena_bytes < LT_ARENA_BYTES_INIT)
+      arena_bytes = LT_ARENA_BYTES_INIT;
 
-    lt__g.arena = arena_create(arena_bytes);
+    lt__g.arena = lt_arena_create(arena_bytes);
     if (!lt__g.arena)
       return LT_ERR_MEM;
   }
 
-  arena_reset(lt__g.arena);
+  lt_arena_reset(lt__g.arena);
 
-  struct lt_cell *base =
-      arena_alloc(lt__g.arena, cells_bytes * 2, ARENA_ALIGNOF(struct lt_cell));
+  struct lt_cell *base = lt_arena_alloc(lt__g.arena, cells_bytes * 2,
+                                        LT_ARENA_ALIGNOF(struct lt_cell));
   if (!base)
     return LT_ERR_MEM;
 
@@ -50,8 +50,8 @@ int lt__buffer_resize(int w, int h) {
   lt__buffer_clear(lt__g.back, (int)n, lt__g.clear_fg, lt__g.clear_bg);
   lt__buffer_clear(lt__g.front, (int)n, lt__g.clear_fg, lt__g.clear_bg);
 
-  lt__g.dirty_rows =
-      arena_alloc(lt__g.arena, (size_t)h * sizeof(bool), ARENA_ALIGNOF(bool));
+  lt__g.dirty_rows = lt_arena_alloc(lt__g.arena, (size_t)h * sizeof(bool),
+                                    LT_ARENA_ALIGNOF(bool));
   if (!lt__g.dirty_rows)
     return LT_ERR_MEM;
 
@@ -92,7 +92,7 @@ int lt__handle_resize(int new_w, int new_h, struct lt_event *ev) {
 
 void lt__buffer_free(void) {
   if (lt__g.arena)
-    arena_free(lt__g.arena);
+    lt_arena_free(lt__g.arena);
 
   lt__g.arena = NULL;
   lt__g.back = NULL;

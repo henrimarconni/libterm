@@ -64,7 +64,7 @@ struct lt__state {
 #if LT_RENDER_STATS
   struct lt__render_stats stats;
 #endif
-  Arena *arena; /* arena for back/front buffers */
+  struct lt_arena *arena; /* arena for back/front buffers */
 };
 
 extern struct lt__state lt__g;
