@@ -7,6 +7,14 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-06
+
+First release. (Re-tagged 2026-06-06 to fold in the packaging and
+consumption work that landed immediately after the original 2026-06-05 tag,
+and again 2026-06-07 to fold in the input-correctness fixes below —
+key-release suppression, Shift+letter text — found by the first real
+consumer.)
+
 ### Changed
 - Key-release events are no longer delivered by default. On terminals that
   report them (kitty keyboard protocol on POSIX, the Win32 console), a caller
@@ -25,12 +33,6 @@ may contain breaking API changes; patch versions never do).
 - `lt_arena_restore` freed blocks with raw `free()` instead of the platform
   allocation macro, mismatching `HeapAlloc` on Windows (latent — no caller
   yet).
-
-## [0.1.0] - 2026-06-06
-
-First release. (Re-tagged 2026-06-06 to fold in the packaging and
-consumption work that landed immediately after the original 2026-06-05 tag;
-the prebuilt archives were rebuilt from the re-tagged commit.)
 
 ### Added
 - Prebuilt release binaries: every published GitHub release automatically
