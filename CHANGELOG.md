@@ -7,6 +7,25 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Changed
+- Key-release events are no longer delivered by default. On terminals that
+  report them (kitty keyboard protocol on POSIX, the Win32 console), a caller
+  that switched on `key`/`ch` without checking `ev.action` handled every
+  keystroke twice — typing showed doubled characters. Releases are now dropped
+  at delivery; OR the new `LT_INPUT_RELEASE` flag into `lt_set_input_mode` to
+  receive them. Press and repeat events are unaffected.
+
+### Fixed
+- Shift+letter on kitty-capable terminals now reports the shifted character
+  (`ch='J'`, `LT_MOD_SHIFT`) instead of the base codepoint (`'j'`). The kitty
+  negotiation requests the report-associated-text flag (`CSI > 27 u`) and the
+  CSI-u decoder prefers the layout-translated text codepoint for `ch` — parity
+  with the Windows console and legacy POSIX paths. Caps Lock typing is covered
+  by the same mechanism.
+- `lt_arena_restore` freed blocks with raw `free()` instead of the platform
+  allocation macro, mismatching `HeapAlloc` on Windows (latent — no caller
+  yet).
+
 ## [0.1.0] - 2026-06-06
 
 First release. (Re-tagged 2026-06-06 to fold in the packaging and

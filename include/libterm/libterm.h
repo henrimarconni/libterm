@@ -88,8 +88,11 @@ extern "C" {
 
 /* ---- key action (lt_event.action) ---- */
 /* In the modern input model libterm reports the action of a key event. Legacy
- * decoding and compat mode always report PRESS. REPEAT/RELEASE are only
- * delivered by terminals speaking the kitty keyboard protocol. */
+ * decoding and compat mode always report PRESS. REPEAT/RELEASE originate from
+ * terminals speaking the kitty keyboard protocol (POSIX) or the Win32 console.
+ * RELEASE events are suppressed by default — a caller that ignores `action`
+ * sees each keystroke once; OR LT_INPUT_RELEASE into the input mode to receive
+ * them. */
 #define LT_KEY_PRESS 1
 #define LT_KEY_REPEAT 2
 #define LT_KEY_RELEASE 3
@@ -235,8 +238,8 @@ struct lt_event {
   int32_t h;
   int32_t x;
   int32_t y;
-  uint8_t action; /* LT_KEY_PRESS/REPEAT/RELEASE; PRESS unless kitty reports
-                     otherwise */
+  uint8_t action; /* LT_KEY_PRESS/REPEAT/RELEASE; PRESS unless kitty/Win32
+                     reports otherwise. RELEASE only with LT_INPUT_RELEASE. */
 };
 
 /* ---- lifecycle ---- */
@@ -390,12 +393,19 @@ LT_API int lt_get_fds(int *ttyfd, int *resizefd);
  * with no modifier, and the kitty keyboard protocol is NOT negotiated. Without
  * this flag libterm uses the modern model (see lt_set_input_mode). */
 #define LT_INPUT_COMPAT 8
+/* Deliver key-release events (action == LT_KEY_RELEASE). Off by default: a
+ * caller that switches on `key`/`ch` without checking `action` would otherwise
+ * handle every keystroke twice on terminals that report releases (kitty
+ * protocol / Win32 console). Releases are dropped at delivery, before the
+ * caller sees them; press and repeat events are always delivered. */
+#define LT_INPUT_RELEASE 16
 
 /* Select how input is reported, an OR of LT_INPUT_* flags. LT_INPUT_ESC (the
  * default) reports a lone ESC as its own key and an Alt-combo as ESC followed
  * by the key; LT_INPUT_ALT folds an Alt-combo into one event with LT_MOD_ALT
  * set. OR in LT_INPUT_MOUSE to enable SGR (1006) mouse reporting (emits the
- * enable handshake; clearing it emits the disable). LT_INPUT_CURRENT queries
+ * enable handshake; clearing it emits the disable). OR in LT_INPUT_RELEASE to
+ * receive key-release events (suppressed by default). LT_INPUT_CURRENT queries
  * without changing. Returns the resulting mode (the current mode for
  * LT_INPUT_CURRENT). */
 LT_API int lt_set_input_mode(int mode);

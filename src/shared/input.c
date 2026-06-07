@@ -1,16 +1,35 @@
 #include "internal.h"
 #include "platform.h"
 
+/* Read one event from the platform layer, dropping key releases unless the
+ * caller opted in via LT_INPUT_RELEASE. The drop happens here — the single
+ * choke point both platforms' events flow through — so a caller that switches
+ * on key/ch without checking `action` sees each keystroke once (the decoders
+ * still produce releases; only delivery is gated). On a drop the wait is
+ * re-entered with the same timeout: a release is a one-shot per keystroke, so
+ * the over-wait is bounded by typing rate and irrelevant for timeout 0/-1. */
+static int lt__read_event_filtered(struct lt_event *event, int timeout_ms) {
+  for (;;) {
+    int rc = lt__plat_read_event(event, timeout_ms);
+    if (rc != LT_OK)
+      return rc;
+    if (event->type == LT_EVENT_KEY && event->action == LT_KEY_RELEASE &&
+        !(lt__g.input_mode & LT_INPUT_RELEASE))
+      continue;
+    return rc;
+  }
+}
+
 int lt_poll_event(struct lt_event *event) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
-  return lt__plat_read_event(event, -1);
+  return lt__read_event_filtered(event, -1);
 }
 
 int lt_peek_event(struct lt_event *event, int timeout_ms) {
   if (!lt__g.initialized)
     return LT_ERR_NOT_INIT;
-  return lt__plat_read_event(event, timeout_ms);
+  return lt__read_event_filtered(event, timeout_ms);
 }
 
 int lt_get_fds(int *ttyfd, int *resizefd) {
