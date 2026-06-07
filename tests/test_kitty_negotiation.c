@@ -45,7 +45,7 @@ int main(void) {
     return 77;
   size_t n = drain(master, buf, sizeof(buf));
   buf[n < sizeof(buf) ? n : sizeof(buf) - 1] = '\0';
-  assert(memmem(buf, n, "\x1b[>11u", 6) != NULL);
+  assert(memmem(buf, n, "\x1b[>27u", 6) != NULL);
 
   /* Shutdown must emit the pop "ESC [ < u". */
   lt_shutdown();
@@ -65,7 +65,7 @@ int main(void) {
   lt_set_input_mode(LT_INPUT_COMPAT);
   n = drain(master2, buf, sizeof(buf));
   assert(memmem(buf, n, "\x1b[<u", 4) != NULL);   /* popped */
-  assert(memmem(buf, n, "\x1b[>11u", 6) == NULL); /* no new push */
+  assert(memmem(buf, n, "\x1b[>27u", 6) == NULL); /* no new push */
   lt_shutdown();
 
   close(master);

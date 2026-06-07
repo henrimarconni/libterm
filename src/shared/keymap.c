@@ -330,12 +330,18 @@ static uint16_t lt__named_control_key(uint32_t cp) {
 }
 
 /* kitty CSI-u: ESC [ code[:shifted:base] ; mods[:event] [; text] u.
- * Only the primary code, the mods low bits, and the event-type sub-param are
- * used. Returns MATCH/PARTIAL/NOMATCH. Called when seq starts ESC [ <digit>. */
+ * The primary code, the mods low bits, the event-type sub-param, and the first
+ * text codepoint are used. The text codepoint (sent under the report-
+ * associated-text flag) is the layout-translated character — it carries what
+ * the keystroke actually typed (Shift+j -> 'J', Caps Lock included), which the
+ * primary code alone loses; it wins over the base code for `ch` so the kitty
+ * path reports the same character a legacy terminal or the Win32 console
+ * would. Returns MATCH/PARTIAL/NOMATCH. Called when seq starts ESC [ <digit>.
+ */
 static enum lt__key_match lt__match_kitty_u(const unsigned char *seq,
                                             size_t len, struct lt_event *out,
                                             size_t *consumed) {
-  int code = 0, mods = 0, event = 1;
+  int code = 0, mods = 0, event = 1, text = 0;
   bool seen_code = false;
   int field = 0;    /* 0=code, 1=mods, 2=text */
   int subfield = 0; /* within a field, after ':' */
@@ -350,8 +356,11 @@ static enum lt__key_match lt__match_kitty_u(const unsigned char *seq,
         mods = lt__km_accum(mods, c);
       } else if (field == 1 && subfield == 1) {
         event = lt__km_accum(event == 1 ? 0 : event, c);
+      } else if (field == 2 && subfield == 0) {
+        text = lt__km_accum(text, c); /* first text codepoint only */
       }
-      /* digits in other sub/fields (shifted-key, text) are ignored */
+      /* digits in other sub/fields (shifted-key, extra text codepoints) are
+       * ignored */
     } else if (c == ';') {
       field++;
       subfield = 0;
@@ -385,7 +394,10 @@ static enum lt__key_match lt__match_kitty_u(const unsigned char *seq,
     out->ch = 0;
   } else {
     out->key = 0;
-    out->ch = (lt_uchar)code; /* base codepoint */
+    /* Prefer the associated text (layout-translated: Shift+j -> 'J') over the
+     * base codepoint; fall back when the terminal sent none (no text flag
+     * negotiated, or a release event, which carries no text). */
+    out->ch = (text != 0) ? (lt_uchar)text : (lt_uchar)code;
   }
   *consumed = len;
   return LT__KEY_MATCH;

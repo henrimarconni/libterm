@@ -178,9 +178,11 @@ int lt__plat_get_size(int *w, int *h) {
 }
 
 /* Flags 0x1 (disambiguate) | 0x2 (event types) | 0x8 (report all keys as
- * escape codes) = 11. Push on enable, pop on disable. */
+ * escape codes) | 0x10 (report associated text — the layout-translated
+ * character, so Shift+j yields 'J' in ch like Windows/legacy paths) = 27.
+ * Push on enable, pop on disable. */
 int lt__plat_kitty_enable(void) {
-  static const char seq[] = "\x1b[>11u";
+  static const char seq[] = "\x1b[>27u";
   int rc = lt__plat_write(seq, sizeof(seq) - 1);
   if (rc != LT_OK)
     return rc;

@@ -125,8 +125,32 @@ int main(void) {
     assert(e.ch == 'a' && e.mod == LT_MOD_CTRL);
   }
   {
-    struct lt_event e = decode_ok("\x1b[97;2u", 7, 0); /* shift+a */
+    /* shift+a, no associated text (terminal without the text flag): falls
+     * back to the base codepoint. */
+    struct lt_event e = decode_ok("\x1b[97;2u", 7, 0);
     assert(e.ch == 'a' && e.mod == LT_MOD_SHIFT);
+  }
+  {
+    /* shift+j with associated text: ch is the layout-translated 'J' (74),
+     * not the base codepoint 'j' (106) — parity with Windows/legacy paths. */
+    struct lt_event e = decode_ok("\x1b[106;2;74u", 11, 0);
+    assert(e.ch == 'J' && e.mod == LT_MOD_SHIFT);
+  }
+  {
+    /* Caps Lock typing: no shift mod, but the text codepoint still carries
+     * the translated character. */
+    struct lt_event e = decode_ok("\x1b[106;1;74u", 11, 0);
+    assert(e.ch == 'J' && e.mod == 0);
+  }
+  {
+    /* Multi-codepoint text: only the first is reported in ch. */
+    struct lt_event e = decode_ok("\x1b[97;1;97:98u", 13, 0);
+    assert(e.ch == 'a');
+  }
+  {
+    /* Shifted-key sub-param on the code field is still skipped; text wins. */
+    struct lt_event e = decode_ok("\x1b[106:74;2;74u", 14, 0);
+    assert(e.ch == 'J' && e.mod == LT_MOD_SHIFT);
   }
   {
     struct lt_event e = decode_ok("\x1b[97;1:3u", 9, 0); /* 'a' release */
