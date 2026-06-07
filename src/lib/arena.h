@@ -460,8 +460,7 @@ void lt_arena_restore(struct lt_arena *arena,
     }
     block = block->next;
   }
-  assert(found &&
-         "lt_arena_restore: checkpoint does not belong to this arena");
+  assert(found && "lt_arena_restore: checkpoint does not belong to this arena");
   assert(checkpoint.index <= checkpoint.block->capacity &&
          "lt_arena_restore: checkpoint index is invalid");
 #endif
