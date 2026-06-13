@@ -10,7 +10,7 @@ All identifiers use the `lt_` / `LT_` prefix.
 
 ## Features
 
-- **termbox2-compatible API** — `tb_`/`TB_` renamed to `lt_`/`LT_`; see the [Roadmap](ROADMAP.md) for per-symbol status.
+- **termbox2-compatible API** — `tb_`/`TB_` renamed to `lt_`/`LT_`, or drop in `compat/termbox2.h` to build existing termbox2 code unchanged ([porting guide](https://github.com/rizukirr/libterm/wiki/Porting-from-termbox2)). See the [Roadmap](ROADMAP.md) for per-symbol status.
 - **POSIX + Windows** — `/dev/tty` + termios raw mode, or the Win32 Console API. No `#ifdef` in shared code.
 - **Double-buffered diff rendering** with a SIMD-accelerated cell scan (AVX2 / AVX-512 / NEON / SVE / RVV, scalar fallback) — all backends for your architecture are compiled in and the best one is **selected at runtime** from CPU capabilities, so one binary is fast on capable CPUs and safe on all of them. Pin a single backend with `-DLIBTERM_SIMD=<backend>`.
 - **Unicode** — UTF-8 decode/encode, `wcwidth` (wide & zero-width handling), and grapheme clusters (combining marks, ZWJ emoji).
@@ -125,10 +125,13 @@ Built into `build/examples/`:
 | `keyboard` | termbox2's classic on-screen keyboard demo, ported by prefix swap (+ `LT_INPUT_COMPAT`) |
 | `mouse` | SGR mouse events |
 | `kbd` | on-screen keyboard + live event inspector (keys, modifiers, `action`, bare modifiers) with an input-model indicator (kitty / legacy / Win32) |
+| `editor` | a small text editor built against the drop-in `compat/termbox2.h` — open a file, edit, Save As, `Ctrl-S` / `Ctrl-Q` |
 
 ## Documentation
 
 Full API reference and guides live in the [project wiki](https://github.com/rizukirr/libterm/wiki).
+
+- **[Porting from termbox2](https://github.com/rizukirr/libterm/wiki/Porting-from-termbox2)** — the drop-in `compat/termbox2.h`, what's supported, and the one `Ctrl`+letter input-model gotcha (with both the compat and modern fixes).
 
 ## License
 
