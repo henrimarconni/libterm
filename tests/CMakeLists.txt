@@ -34,6 +34,29 @@ libterm_add_test(test_simd_diff)
 libterm_add_test(test_keymap)
 libterm_add_test(test_detect_color_depth)
 libterm_add_test(test_color_parse)
+# compat/termbox2.h drop-in layer: compile+link proof that every aliased symbol
+# resolves. Platform-agnostic (no terminal init), so it runs everywhere.
+add_executable(compat_smoke compat_smoke.c)
+target_link_libraries(compat_smoke PRIVATE ${LIBTERM_LINK_TARGET})
+target_include_directories(compat_smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/compat
+    ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME compat_smoke COMMAND compat_smoke)
+
+# White-box regression test for examples/editor.c's buffer model (#includes the
+# editor TU with main() compiled out). Guards the insert_newline use-after-free.
+# POSIX-only: the editor uses getline(), which MinGW does not declare; examples
+# themselves are already EXAMPLES=OFF on the Windows CI lanes.
+if(NOT WIN32)
+    add_executable(test_compat_editor test_compat_editor.c)
+    target_link_libraries(test_compat_editor PRIVATE ${LIBTERM_LINK_TARGET})
+    target_include_directories(test_compat_editor PRIVATE
+        ${PROJECT_SOURCE_DIR}/examples
+        ${PROJECT_SOURCE_DIR}/compat
+        ${PROJECT_SOURCE_DIR}/include)
+    add_test(NAME test_compat_editor COMMAND test_compat_editor)
+endif()
+
 # Dispatch builds: tell the SIMD tests which backends were compiled and
 # register the dispatcher sanity test. (Static builds: no-op.)
 if(LIBTERM_SIMD_BACKENDS)
@@ -164,6 +187,13 @@ if(NOT WIN32)
         target_include_directories(test_color_query PRIVATE ${PROJECT_SOURCE_DIR}/src)
         add_test(NAME test_color_query COMMAND test_color_query)
         set_tests_properties(test_color_query PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
+        add_executable(test_compat_get_cell test_compat_get_cell.c)
+        target_link_libraries(test_compat_get_cell PRIVATE ${LIBTERM_LINK_TARGET} ${LIBTERM_PTY_LIBS})
+        target_include_directories(test_compat_get_cell PRIVATE
+            ${PROJECT_SOURCE_DIR}/compat
+            ${PROJECT_SOURCE_DIR}/include)
+        add_test(NAME test_compat_get_cell COMMAND test_compat_get_cell)
+        set_tests_properties(test_compat_get_cell PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
     endif()
 endif()
 
