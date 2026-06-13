@@ -22,3 +22,4 @@ function(libterm_add_fuzzer name)
 endfunction()
 
 libterm_add_fuzzer(fuzz_keymap)
+libterm_add_fuzzer(fuzz_colorq)
