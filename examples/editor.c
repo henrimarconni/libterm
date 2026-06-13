@@ -216,6 +216,13 @@ int main(int argc, char **argv) {
   if (tb_init() != TB_OK)
     die("tb_init failed");
 
+  /* libterm defaults to its modern key model, where Ctrl+letter arrives as
+   * ch + LT_MOD_CTRL (key == 0). This editor is written in the termbox2 idiom
+   * (ev.key == TB_KEY_CTRL_S/Q/...), so opt into termbox2 control-byte
+   * semantics — the one documented adaptation a termbox2 program needs. This
+   * is the only LT_* symbol the editor references; everything else is tb_/TB_. */
+  tb_set_input_mode(LT_INPUT_COMPAT);
+
   for (;;) {
     scroll_into_view();
     draw();
