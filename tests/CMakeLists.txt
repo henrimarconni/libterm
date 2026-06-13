@@ -34,6 +34,14 @@ libterm_add_test(test_simd_diff)
 libterm_add_test(test_keymap)
 libterm_add_test(test_detect_color_depth)
 libterm_add_test(test_color_parse)
+# compat/termbox2.h drop-in layer: compile+link proof that every aliased symbol
+# resolves. Platform-agnostic (no terminal init), so it runs everywhere.
+add_executable(compat_smoke compat_smoke.c)
+target_link_libraries(compat_smoke PRIVATE ${LIBTERM_LINK_TARGET})
+target_include_directories(compat_smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/compat
+    ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME compat_smoke COMMAND compat_smoke)
 # Dispatch builds: tell the SIMD tests which backends were compiled and
 # register the dispatcher sanity test. (Static builds: no-op.)
 if(LIBTERM_SIMD_BACKENDS)
