@@ -203,3 +203,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET libterm_shared)
                 ${PROJECT_SOURCE_DIR}/include/libterm/libterm.h
                 $<TARGET_FILE:libterm_shared>)
 endif()
+
+# libFuzzer targets (opt-in, clang-only). LIBTERM_LINK_TARGET is already set
+# above. Not registered as ctest tests — CI invokes them directly.
+if(LIBTERM_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
