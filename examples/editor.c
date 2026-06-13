@@ -95,19 +95,33 @@ static void insert_char(char c) {
 }
 
 static void insert_newline(void) {
-  struct erow *row = &g_rows[g_cy];
-  append_row("", 0); /* grow the array; positions are overwritten below */
-  memmove(&g_rows[g_cy + 2], &g_rows[g_cy + 1],
-          (g_nrows - (size_t)g_cy - 2) * sizeof *g_rows);
-  size_t tail = row->len - (size_t)g_cx;
-  g_rows[g_cy + 1].chars = (char *)malloc(tail + 1);
-  if (!g_rows[g_cy + 1].chars)
+  /* Grow the row array by one. realloc may MOVE g_rows, so we must hold no
+   * pointer into it across this call and re-index g_rows[g_cy] afterwards.
+   * (The earlier version captured `&g_rows[g_cy]` before the grow and then
+   * dereferenced it — a use-after-free that read a garbage length and asked
+   * for a huge allocation, surfacing as "out of memory" when Enter was hit.) */
+  struct erow *nr =
+      (struct erow *)realloc(g_rows, (g_nrows + 1) * sizeof *g_rows);
+  if (!nr)
     die("out of memory");
-  memcpy(g_rows[g_cy + 1].chars, &row->chars[g_cx], tail);
-  g_rows[g_cy + 1].chars[tail] = '\0';
+  g_rows = nr;
+  /* Open a slot at g_cy+1 by shifting the rows after it down by one. */
+  memmove(&g_rows[g_cy + 2], &g_rows[g_cy + 1],
+          (g_nrows - (size_t)g_cy - 1) * sizeof *g_rows);
+  g_nrows++;
+  /* New row g_cy+1 takes the text from the split point onward. g_rows[g_cy] is
+   * re-indexed after the realloc; its .chars buffer survived the move. */
+  size_t tail = g_rows[g_cy].len - (size_t)g_cx;
+  char *buf = (char *)malloc(tail + 1);
+  if (!buf)
+    die("out of memory");
+  memcpy(buf, &g_rows[g_cy].chars[g_cx], tail);
+  buf[tail] = '\0';
+  g_rows[g_cy + 1].chars = buf;
   g_rows[g_cy + 1].len = tail;
-  row->chars[g_cx] = '\0';
-  row->len = (size_t)g_cx;
+  /* Truncate the current row at the split point. */
+  g_rows[g_cy].chars[g_cx] = '\0';
+  g_rows[g_cy].len = (size_t)g_cx;
   g_cy++;
   g_cx = 0;
   g_dirty = 1;
@@ -189,6 +203,9 @@ static void move_cursor(uint16_t key) {
     g_cx = (int)g_rows[g_cy].len;
 }
 
+/* EDITOR_NO_MAIN lets a white-box test (#include "editor.c") exercise the
+ * buffer functions directly, without a terminal. */
+#ifndef EDITOR_NO_MAIN
 int main(int argc, char **argv) {
   g_filename = argc > 1 ? argv[1] : NULL;
   if (g_filename)
@@ -231,3 +248,4 @@ int main(int argc, char **argv) {
   free(g_rows);
   return 0;
 }
+#endif /* EDITOR_NO_MAIN */
