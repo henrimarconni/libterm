@@ -341,6 +341,7 @@ jobs:
           while IFS= read -r bin; do
             echo "== valgrind $bin =="
             valgrind --error-exitcode=1 --leak-check=full \
-                     --errors-for-leak-kinds=definite \
+                     --errors-for-leak-kinds=definite,indirect \
+                     --show-leak-kinds=definite,indirect \
                      --suppressions=tests/valgrind.supp "$bin"
           done <<< "$cmds"
