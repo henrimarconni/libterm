@@ -172,6 +172,13 @@ if(NOT WIN32)
         target_include_directories(test_color_query PRIVATE ${PROJECT_SOURCE_DIR}/src)
         add_test(NAME test_color_query COMMAND test_color_query)
         set_tests_properties(test_color_query PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
+        add_executable(test_compat_get_cell test_compat_get_cell.c)
+        target_link_libraries(test_compat_get_cell PRIVATE ${LIBTERM_LINK_TARGET} ${LIBTERM_PTY_LIBS})
+        target_include_directories(test_compat_get_cell PRIVATE
+            ${PROJECT_SOURCE_DIR}/compat
+            ${PROJECT_SOURCE_DIR}/include)
+        add_test(NAME test_compat_get_cell COMMAND test_compat_get_cell)
+        set_tests_properties(test_compat_get_cell PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
     endif()
 endif()
 
