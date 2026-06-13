@@ -280,3 +280,31 @@ jobs:
         run: |
           files=$(find src/shared src/platform/posix src/lib -name '*.c')
           clang-tidy -p build --warnings-as-errors='*' $files
+
+  # --------------------------------------------------------------------------
+  # Build the libFuzzer targets (clang) and run a short smoke per target:
+  # replay the seed corpus (-runs=0) + a brief exploratory run. Fails on any
+  # crash. The full ~1h run lives in fuzz-nightly.yml.
+  # --------------------------------------------------------------------------
+  fuzz-smoke:
+    name: fuzz-smoke
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Configure
+        run: cmake -S . -B build-fuzz -DLIBTERM_BUILD_FUZZERS=ON
+      - name: Build
+        run: cmake --build build-fuzz --parallel
+      - name: Smoke each target
+        run: |
+          set -euo pipefail
+          for t in keymap colorq utf8; do
+            echo "== fuzz_$t =="
+            ./build-fuzz/tests/fuzz/fuzz_$t -runs=0 tests/fuzz/corpus/$t
+            ./build-fuzz/tests/fuzz/fuzz_$t -max_total_time=30 tests/fuzz/corpus/$t
+          done
