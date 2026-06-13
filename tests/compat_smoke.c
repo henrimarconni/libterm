@@ -19,7 +19,12 @@ int main(void) {
   int (*pset)(int, int, uint32_t, uintattr_t, uintattr_t) = tb_set_cell;
   int (*ppoll)(struct tb_event *) = tb_poll_event;
   int (*pget)(int, int, int, struct tb_cell **) = tb_get_cell;
-  (void)cell; (void)ev; (void)attr; (void)pset; (void)ppoll; (void)pget;
+  (void)cell;
+  (void)ev;
+  (void)attr;
+  (void)pset;
+  (void)ppoll;
+  (void)pget;
 
   /* Every value constant resolves (sum forces each token to be defined). */
   sink += (long long)(TB_OK);
@@ -153,7 +158,8 @@ int main(void) {
   sink += (long long)(TB_KEY_MOUSE_WHEEL_UP);
   sink += (long long)(TB_KEY_MOUSE_WHEEL_DOWN);
 
-  /* Every function/allocator alias resolves (designator referenced + discarded). */
+  /* Every function/allocator alias resolves (designator referenced +
+   * discarded). */
   (void)(tb_init);
   (void)(tb_init_fd);
   (void)(tb_init_file);
@@ -195,7 +201,9 @@ int main(void) {
   (void)(tb_free);
 
   (void)tb_get_cell; /* static-inline adapter designator */
-  if (0) { tb_put_cell(0, 0, &cell); } /* function-like macro expands + links */
+  if (0) {
+    tb_put_cell(0, 0, &cell);
+  } /* function-like macro expands + links */
 
   (void)sink;
   return 0;

@@ -45,14 +45,17 @@ add_test(NAME compat_smoke COMMAND compat_smoke)
 
 # White-box regression test for examples/editor.c's buffer model (#includes the
 # editor TU with main() compiled out). Guards the insert_newline use-after-free.
-# Platform-agnostic — no terminal needed.
-add_executable(test_compat_editor test_compat_editor.c)
-target_link_libraries(test_compat_editor PRIVATE ${LIBTERM_LINK_TARGET})
-target_include_directories(test_compat_editor PRIVATE
-    ${PROJECT_SOURCE_DIR}/examples
-    ${PROJECT_SOURCE_DIR}/compat
-    ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME test_compat_editor COMMAND test_compat_editor)
+# POSIX-only: the editor uses getline(), which MinGW does not declare; examples
+# themselves are already EXAMPLES=OFF on the Windows CI lanes.
+if(NOT WIN32)
+    add_executable(test_compat_editor test_compat_editor.c)
+    target_link_libraries(test_compat_editor PRIVATE ${LIBTERM_LINK_TARGET})
+    target_include_directories(test_compat_editor PRIVATE
+        ${PROJECT_SOURCE_DIR}/examples
+        ${PROJECT_SOURCE_DIR}/compat
+        ${PROJECT_SOURCE_DIR}/include)
+    add_test(NAME test_compat_editor COMMAND test_compat_editor)
+endif()
 
 # Dispatch builds: tell the SIMD tests which backends were compiled and
 # register the dispatcher sanity test. (Static builds: no-op.)
