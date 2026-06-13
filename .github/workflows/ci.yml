@@ -280,3 +280,68 @@ jobs:
         run: |
           files=$(find src/shared src/platform/posix src/lib -name '*.c')
           clang-tidy -p build --warnings-as-errors='*' $files
+
+  # --------------------------------------------------------------------------
+  # Build the libFuzzer targets (clang) and run a short smoke per target:
+  # replay the seed corpus (-runs=0) + a brief exploratory run. Fails on any
+  # crash. The full ~1h run lives in fuzz-nightly.yml.
+  # --------------------------------------------------------------------------
+  fuzz-smoke:
+    name: fuzz-smoke
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Configure
+        run: cmake -S . -B build-fuzz -DLIBTERM_BUILD_FUZZERS=ON
+      - name: Build
+        run: cmake --build build-fuzz --parallel
+      - name: Smoke each target
+        run: |
+          set -euo pipefail
+          for t in keymap colorq utf8; do
+            echo "== fuzz_$t =="
+            ./build-fuzz/tests/fuzz/fuzz_$t -runs=0 tests/fuzz/corpus/$t
+            ./build-fuzz/tests/fuzz/fuzz_$t -max_total_time=30 tests/fuzz/corpus/$t
+          done
+
+  # --------------------------------------------------------------------------
+  # Run valgrind memcheck over the pure-unit test subset (LABELS valgrind_safe)
+  # on a plain Debug build — NO sanitizers (mutually exclusive with valgrind).
+  # Covers uninitialized-memory reads the asan-ubsan job does not. The pty/
+  # timing tests are excluded (their sub-50ms margins flake under ~20x slowdown).
+  # --error-exitcode=1 makes any memcheck error fail the job.
+  # --------------------------------------------------------------------------
+  valgrind:
+    name: valgrind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Configure
+        run: cmake -S . -B build-vg -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build-vg --parallel
+      - name: Memcheck the valgrind_safe subset
+        run: |
+          set -euo pipefail
+          # Extract each labeled test's executable command from ctest's JSON,
+          # then run it under memcheck. Hard-fails on any error or definite leak.
+          cmds=$(ctest --test-dir build-vg -L valgrind_safe --show-only=json-v1 \
+                 | python3 -c "import json,sys; d=json.load(sys.stdin); [print(t['command'][0]) for t in d['tests']]")
+          test -n "$cmds"
+          while IFS= read -r bin; do
+            echo "== valgrind $bin =="
+            valgrind --error-exitcode=1 --leak-check=full \
+                     --errors-for-leak-kinds=definite,indirect \
+                     --show-leak-kinds=definite,indirect \
+                     --suppressions=tests/valgrind.supp "$bin"
+          done <<< "$cmds"

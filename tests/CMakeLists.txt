@@ -203,3 +203,26 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND TARGET libterm_shared)
                 ${PROJECT_SOURCE_DIR}/include/libterm/libterm.h
                 $<TARGET_FILE:libterm_shared>)
 endif()
+
+# Tag the pure, non-pty, non-timing tests so the valgrind CI job can select
+# them (ctest -L valgrind_safe). The pty/timing tests are excluded: valgrind's
+# ~20x slowdown blows their sub-50ms timing margins (esp. test_posix_input_frag).
+# Only tests that actually exist in this configuration are labeled.
+set(LIBTERM_VALGRIND_SAFE
+    test_utf8 test_wcwidth test_buffer test_api test_simd_diff test_keymap
+    test_color_parse test_detect_color_depth)
+if(NOT WIN32)
+    list(APPEND LIBTERM_VALGRIND_SAFE
+        test_last_errno test_posix_input_parse test_posix_input_sgr_run_split)
+endif()
+foreach(t IN LISTS LIBTERM_VALGRIND_SAFE)
+    if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES LABELS valgrind_safe)
+    endif()
+endforeach()
+
+# libFuzzer targets (opt-in, clang-only). LIBTERM_LINK_TARGET is already set
+# above. Not registered as ctest tests — CI invokes them directly.
+if(LIBTERM_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()

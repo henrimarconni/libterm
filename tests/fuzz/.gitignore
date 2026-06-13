@@ -1,0 +1,11 @@
+# libFuzzer writes coverage-increasing corpus units (40-hex-char SHA1 names) and
+# crash/leak/timeout artifacts when an exploratory run is pointed at a corpus
+# dir. Only the human-named seed files (csi_up, fg, ascii, …) are tracked — keep
+# discovered units and crash artifacts out of git. Stage seeds explicitly; never
+# `git add corpus/<target>` wholesale.
+crash-*
+leak-*
+timeout-*
+oom-*
+# 40-hex-char libFuzzer corpus unit names (SHA1 of the input):
+corpus/*/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]

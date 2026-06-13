@@ -20,6 +20,7 @@ option(LIBTERM_BUILD_BENCH    "Build benchmark programs"   ${PROJECT_IS_TOP_LEVE
 option(LIBTERM_BUILD_TESTS    "Build unit tests"           ${PROJECT_IS_TOP_LEVEL})
 option(LIBTERM_INSTALL        "Generate install rules"     ${PROJECT_IS_TOP_LEVEL})
 option(LIBTERM_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+option(LIBTERM_BUILD_FUZZERS  "Build libFuzzer targets (clang only)" OFF)
 
 include(cmake/CompilerWarnings.cmake)
 

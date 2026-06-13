@@ -1,0 +1,40 @@
+name: fuzz-nightly
+
+# Long fuzz run (~20 min/target, ~1h combined) — DoD #7 "fuzzer runs an hour".
+# Does not gate PRs. Manual runs via workflow_dispatch.
+on:
+  schedule:
+    - cron: '0 4 * * *'   # daily 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    name: fuzz-${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [keymap, colorq, utf8]
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: 'latest'
+      - name: Configure
+        run: cmake -S . -B build-fuzz -DLIBTERM_BUILD_FUZZERS=ON
+      - name: Build
+        run: cmake --build build-fuzz --target fuzz_${{ matrix.target }} --parallel
+      - name: Fuzz ~20 min
+        run: |
+          ./build-fuzz/tests/fuzz/fuzz_${{ matrix.target }} \
+            -max_total_time=1200 -print_final_stats=1 \
+            tests/fuzz/corpus/${{ matrix.target }}
+      - name: Upload crash (if any)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: crash-*
+          if-no-files-found: ignore

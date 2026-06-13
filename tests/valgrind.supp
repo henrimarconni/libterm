@@ -1,0 +1,4 @@
+# Valgrind memcheck suppressions for libterm's valgrind_safe test subset.
+# Keep this minimal and commented — every entry must name a known-benign source
+# (e.g. libc/loader noise on the CI image), never a real libterm defect.
+# Empty by default; add entries only with a one-line justification above each.
