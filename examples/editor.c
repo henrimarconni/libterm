@@ -43,22 +43,52 @@ static void append_row(const char *s, size_t len) {
   g_nrows++;
 }
 
+/* Portable line reader: getline(3) is POSIX and is not provided by the MinGW C
+ * runtime, so read a line ourselves. Returns a malloc'd, NUL-terminated buffer
+ * (caller frees) with the trailing newline stripped, or NULL at end of file.
+ * *out_len receives the length excluding the NUL. */
+static char *read_line(FILE *f, size_t *out_len) {
+  size_t cap = 0, len = 0;
+  char *buf = NULL;
+  int c;
+  while ((c = fgetc(f)) != EOF) {
+    if (len + 1 >= cap) {
+      size_t ncap = cap ? cap * 2 : 128;
+      char *nb = (char *)realloc(buf, ncap);
+      if (!nb) {
+        free(buf);
+        die("out of memory");
+      }
+      buf = nb;
+      cap = ncap;
+    }
+    if (c == '\n')
+      break;
+    buf[len++] = (char)c;
+  }
+  if (c == EOF && len == 0) {
+    free(buf);
+    return NULL;
+  }
+  if (len > 0 && buf[len - 1] == '\r') /* handle CRLF */
+    len--;
+  buf[len] = '\0';
+  *out_len = len;
+  return buf;
+}
+
 static void load_file(const char *path) {
   FILE *f = fopen(path, "r");
   if (!f) {
     append_row("", 0); /* new file: start with one empty line */
     return;
   }
-  char *line = NULL;
-  size_t cap = 0;
-  ssize_t n;
-  while ((n = getline(&line, &cap, f)) != -1) {
-    size_t len = (size_t)n;
-    while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
-      len--;
+  char *line;
+  size_t len;
+  while ((line = read_line(f, &len)) != NULL) {
     append_row(line, len);
+    free(line);
   }
-  free(line);
   fclose(f);
   if (g_nrows == 0)
     append_row("", 0);
