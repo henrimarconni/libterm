@@ -17,3 +17,7 @@ libterm_add_example(truecolor)
 libterm_add_example(kbd)
 libterm_add_example(theme)
 libterm_add_example(resize)
+libterm_add_example(editor)
+# The editor builds against the termbox2 compat layer (drop-in proof, DoD #8),
+# so it needs compat/ on its include path to resolve `#include "termbox2.h"`.
+target_include_directories(editor PRIVATE ${PROJECT_SOURCE_DIR}/compat)
