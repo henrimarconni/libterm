@@ -7,6 +7,40 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-13
+
+Tooling + compatibility release. The core library API and ABI are unchanged
+from 0.1.0 (every `lt_*` symbol behaves identically); `lt_version()` now
+returns `"0.1.1"`. No code changes were required in callers.
+
+### Added
+- **`compat/termbox2.h`** — a single drop-in header mapping the supported
+  termbox2 `tb_`/`TB_` API onto libterm, so existing termbox2 programs compile
+  and link unchanged. Functions and the full `TB_KEY_*` / `TB_MOD_*` /
+  `TB_EVENT_*` / `TB_OUTPUT_*` / `TB_INPUT_*` constant set, colors, attributes,
+  return codes, and `struct tb_cell` / `struct tb_event` / `uintattr_t` are
+  aliased; `tb_get_cell` / `tb_put_cell` are adapted; the five functions libterm
+  has no equivalent for (`tb_init_rwfd`, `tb_set_func`, `tb_has_truecolor`,
+  `tb_cell_buffer`, `tb_key_i`) become a compile error naming the `lt_`
+  alternative. `tb_init` keeps libterm's modern key model; opt into termbox2
+  control-byte semantics with `tb_set_input_mode(LT_INPUT_COMPAT)`.
+- **`examples/editor.c`** — a minimal text editor (open/edit/save, cursor
+  movement, a Save As prompt, `Ctrl-S` / `Ctrl-Q`) built only against
+  `compat/termbox2.h`.
+- **Fuzzing** — libFuzzer harnesses for the three untrusted-input parsers (the
+  escape-sequence decoder, the OSC color-reply parser, and the UTF-8 decoder),
+  with seed corpora, a per-PR smoke run, and a nightly ~1h-per-target run
+  (`-DLIBTERM_BUILD_FUZZERS=ON`, clang-only).
+- **valgrind** — a memcheck CI job over the pure-unit test subset (new
+  `valgrind_safe` CTest label), catching uninitialized-memory reads the
+  AddressSanitizer/UBSan job does not; fails on definite and indirect leaks.
+
+### Documentation
+- New wiki page **Porting from termbox2** (the compat header, what's supported,
+  and the `Ctrl`+letter input-model gotcha with both fixes); a fuzzing how-to
+  (`tests/fuzz/README.md`); README pointers to the compat header, the porting
+  guide, and the editor example.
+
 ## [0.1.0] - 2026-06-06
 
 First release. (Re-tagged 2026-06-06 to fold in the packaging and
