@@ -203,6 +203,47 @@ static void move_cursor(uint16_t key) {
     g_cx = (int)g_rows[g_cy].len;
 }
 
+/* Prompt for a filename on the status line (a minimal "Save As"). Returns 1
+ * with `out` filled when the user presses Enter on a non-empty name, 0 if they
+ * cancel with Esc or confirm an empty name. */
+static int prompt_filename(char *out, size_t cap) {
+  static const char label[] = "Save as: ";
+  size_t len = 0;
+  out[0] = '\0';
+  for (;;) {
+    int w = tb_width();
+    int h = tb_height();
+    int x = 0;
+    for (size_t i = 0; label[i] != '\0' && x < w; i++, x++)
+      tb_set_cell(x, h - 1, (uint32_t)(unsigned char)label[i], TB_DEFAULT,
+                  TB_REVERSE);
+    for (size_t i = 0; i < len && x < w; i++, x++)
+      tb_set_cell(x, h - 1, (uint32_t)(unsigned char)out[i], TB_DEFAULT,
+                  TB_REVERSE);
+    for (; x < w; x++)
+      tb_set_cell(x, h - 1, ' ', TB_DEFAULT, TB_REVERSE);
+    tb_set_cursor((int)(sizeof label - 1 + len), h - 1);
+    tb_present();
+
+    struct tb_event ev;
+    if (tb_poll_event(&ev) != TB_OK)
+      continue;
+    if (ev.type != TB_EVENT_KEY)
+      continue;
+    if (ev.key == TB_KEY_ESC)
+      return 0;
+    if (ev.key == TB_KEY_ENTER)
+      return len > 0 ? 1 : 0;
+    if (ev.key == TB_KEY_BACKSPACE || ev.key == TB_KEY_BACKSPACE2) {
+      if (len > 0)
+        out[--len] = '\0';
+    } else if (ev.ch != 0 && ev.ch < 128 && len + 1 < cap) {
+      out[len++] = (char)ev.ch;
+      out[len] = '\0';
+    }
+  }
+}
+
 /* EDITOR_NO_MAIN lets a white-box test (#include "editor.c") exercise the
  * buffer functions directly, without a terminal. */
 #ifndef EDITOR_NO_MAIN
@@ -235,7 +276,11 @@ int main(int argc, char **argv) {
     if (ev.key == TB_KEY_CTRL_Q)
       break;
     if (ev.key == TB_KEY_CTRL_S) {
-      save_file();
+      static char namebuf[256];
+      if (!g_filename && prompt_filename(namebuf, sizeof namebuf))
+        g_filename = namebuf; /* "Save As": adopt the typed name */
+      if (g_filename)
+        save_file();
       continue;
     }
     if (ev.key == TB_KEY_ENTER) {

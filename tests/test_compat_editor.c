@@ -76,5 +76,6 @@ int main(void) {
   (void)&draw;
   (void)&scroll_into_view;
   (void)&move_cursor;
+  (void)&prompt_filename;
   return 0;
 }
