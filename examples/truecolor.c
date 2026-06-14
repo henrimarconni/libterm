@@ -13,11 +13,6 @@
 
 #include <stdio.h>
 
-static void puts_at(int x, int y, const char *s, lt_attr fg, lt_attr bg) {
-  for (int i = 0; s[i]; i++)
-    lt_set_cell(x + i, y, (lt_uchar)s[i], fg, bg);
-}
-
 int main(void) {
   int rc = lt_init();
   if (rc != LT_OK) {
@@ -35,11 +30,11 @@ int main(void) {
   char title[128];
   snprintf(title, sizeof title,
            "libterm truecolor demo [%s] (press q or Esc to quit)", depth_note);
-  puts_at(2, 1, title, LT_DEFAULT, LT_DEFAULT);
+  lt_print(2, 1, LT_DEFAULT, LT_DEFAULT, title);
 
   /* 24-bit RGB gradient: blue -> red across the row, drawn as cell
    * backgrounds (space glyphs). Each column is a distinct true color. */
-  puts_at(2, 3, "24-bit gradient:", LT_DEFAULT, LT_DEFAULT);
+  lt_print(2, 3, LT_DEFAULT, LT_DEFAULT, "24-bit gradient:");
   for (int i = 0; i < 36; i++) {
     int r = i * 7;
     int b = 255 - i * 7;
@@ -52,21 +47,22 @@ int main(void) {
 
   /* Named LT_RGB swatches: a label drawn on its own background color. The
    * orange swatch uses LT_RGB(0,0,0)|LT_HI_BLACK for genuinely-black text. */
-  puts_at(2, 6, "LT_RGB swatches:", LT_DEFAULT, LT_DEFAULT);
-  puts_at(2, 7, " orange ", LT_RGB(0, 0, 0) | LT_HI_BLACK, LT_RGB(255, 128, 0));
-  puts_at(11, 7, " teal ", LT_RGB(255, 255, 255), LT_RGB(0, 128, 128));
-  puts_at(18, 7, " purple ", LT_RGB(255, 255, 255), LT_RGB(128, 0, 128));
+  lt_print(2, 6, LT_DEFAULT, LT_DEFAULT, "LT_RGB swatches:");
+  lt_print(2, 7, LT_RGB(0, 0, 0) | LT_HI_BLACK, LT_RGB(255, 128, 0),
+           " orange ");
+  lt_print(11, 7, LT_RGB(255, 255, 255), LT_RGB(0, 128, 128), " teal ");
+  lt_print(18, 7, LT_RGB(255, 255, 255), LT_RGB(128, 0, 128), " purple ");
 
   /* LT_HI_BLACK sentinel: terminal default vs real black. The left cell uses
    * the terminal's default background; the right forces RGB(0,0,0). */
-  puts_at(2, 9, "HI_BLACK vs default:", LT_DEFAULT, LT_DEFAULT);
-  puts_at(2, 10, " default-bg ", LT_DEFAULT, LT_DEFAULT);
-  puts_at(15, 10, " real-black ", LT_RGB(255, 255, 255),
-          LT_RGB(0, 0, 0) | LT_HI_BLACK);
+  lt_print(2, 9, LT_DEFAULT, LT_DEFAULT, "HI_BLACK vs default:");
+  lt_print(2, 10, LT_DEFAULT, LT_DEFAULT, " default-bg ");
+  lt_print(15, 10, LT_RGB(255, 255, 255), LT_RGB(0, 0, 0) | LT_HI_BLACK,
+           " real-black ");
 
   /* truecolor color composed with an attribute (bold) — proves attrs still
    * work after their bits moved above the 24-bit color field. */
-  puts_at(2, 12, "truecolor + bold", LT_RGB(255, 96, 0) | LT_BOLD, LT_DEFAULT);
+  lt_print(2, 12, LT_RGB(255, 96, 0) | LT_BOLD, LT_DEFAULT, "truecolor + bold");
 
   lt_present();
 

@@ -22,11 +22,11 @@ cmake_install.cmake
 Makefile
 compile_commands.json
 external/
-/.codex
-/.omx
-/package-lock.json
-/docs
-/.claude
+.codex/
+.omx/
+package-lock.json
+docs/
+.claude/
 CLAUDE.md 
 AGENTS.md
 Testing/
