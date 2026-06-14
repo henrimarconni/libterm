@@ -214,6 +214,12 @@ extern "C" {
   ((lt_attr)((((lt_attr)(r) & 0xFFu) << 16) | (((lt_attr)(g) & 0xFFu) << 8) |  \
              ((lt_attr)(b) & 0xFFu)))
 
+/* Pack a 0xRRGGBB hex color into bits 0-23 for LT_OUTPUT_TRUECOLOR. High bits
+ * (attribute flags + the LT_HI_BLACK sentinel) are masked off, so LT_HEX is a
+ * pure color packer: LT_HEX(0xRRGGBB) packs the same bits as
+ * LT_RGB(0xRR, 0xGG, 0xBB). */
+#define LT_HEX(rgb) ((lt_attr)((rgb) & 0xFFFFFFu))
+
 /* ---- types ---- */
 typedef uint32_t lt_uchar;
 typedef uint32_t lt_attr;
