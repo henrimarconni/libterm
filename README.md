@@ -77,7 +77,7 @@ With CMake, fetch libterm directly and link the exported target:
 include(FetchContent)
 FetchContent_Declare(libterm
     GIT_REPOSITORY https://github.com/rizukirr/libterm
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.1.2)
 FetchContent_MakeAvailable(libterm)
 
 target_link_libraries(myapp PRIVATE Libterm::libterm)

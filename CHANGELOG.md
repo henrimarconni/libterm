@@ -7,6 +7,12 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-15
+
+Additive API release. The core API and ABI are unchanged from 0.1.1 — every
+existing `lt_*` symbol behaves identically; `lt_version()` now returns
+`"0.1.2"`. No code changes are required in callers.
+
 ### Added
 - **`LT_HEX(rgb)`** — pack a `0xRRGGBB` hex color into an `lt_attr`, complementing
   `LT_RGB(r,g,b)`. High bits (attribute flags + the `LT_HI_BLACK` sentinel) are
