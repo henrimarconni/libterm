@@ -7,6 +7,11 @@ may contain breaking API changes; patch versions never do).
 
 ## [Unreleased]
 
+### Added
+- **`LT_HEX(rgb)`** — pack a `0xRRGGBB` hex color into an `lt_attr`, complementing
+  `LT_RGB(r,g,b)`. High bits (attribute flags + the `LT_HI_BLACK` sentinel) are
+  masked, so it is a pure color packer; `LT_HEX(0xRRGGBB) == LT_RGB(0xRR,0xGG,0xBB)`.
+
 ## [0.1.1] - 2026-06-13
 
 Tooling + compatibility release. The core library API and ABI are unchanged

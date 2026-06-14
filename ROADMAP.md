@@ -162,7 +162,7 @@ On **kitty-capable terminals** (negotiated by default), POSIX now delivers `LT_M
 
 ### Colors (`TB_DEFAULT/BLACK/RED/…` → `LT_DEFAULT/BLACK/RED/…`)
 
-Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`, plus `LT_RGB(r,g,b)` (24-bit pack) and the `LT_HI_BLACK` sentinel. Emitted on **both platforms** via mode-aware SGR in the shared `lt__emit_sgr` (`src/shared/sgr.c`) — named (NORMAL), 8-bit palette index (256/216/grayscale), and 24-bit RGB (TRUECOLOR), with `LT_HI_BLACK` distinguishing the terminal default from real black. Emitted bytes asserted on POSIX in `tests/test_posix_sgr_output.c`; Windows runs the same shared code (real-terminal/byte verification pending).
+Declared: `LT_DEFAULT`, `LT_BLACK`, `LT_RED`, `LT_GREEN`, `LT_YELLOW`, `LT_BLUE`, `LT_MAGENTA`, `LT_CYAN`, `LT_WHITE`, plus `LT_RGB(r,g,b)` (24-bit pack), `LT_HEX(0xRRGGBB)` (hex pack, high bits masked), and the `LT_HI_BLACK` sentinel. Emitted on **both platforms** via mode-aware SGR in the shared `lt__emit_sgr` (`src/shared/sgr.c`) — named (NORMAL), 8-bit palette index (256/216/grayscale), and 24-bit RGB (TRUECOLOR), with `LT_HI_BLACK` distinguishing the terminal default from real black. Emitted bytes asserted on POSIX in `tests/test_posix_sgr_output.c`; Windows runs the same shared code (real-terminal/byte verification pending).
 
 ### Attributes (`TB_BOLD/UNDERLINE/…` → `LT_BOLD/UNDERLINE/…`)
 
