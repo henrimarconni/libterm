@@ -34,6 +34,7 @@ libterm_add_test(test_simd_diff)
 libterm_add_test(test_keymap)
 libterm_add_test(test_detect_color_depth)
 libterm_add_test(test_color_parse)
+libterm_add_test(test_color_macros)
 # compat/termbox2.h drop-in layer: compile+link proof that every aliased symbol
 # resolves. Platform-agnostic (no terminal init), so it runs everywhere.
 add_executable(compat_smoke compat_smoke.c)
